@@ -34,14 +34,18 @@ services:
       - S3_FORCE_PATH_STYLE=true
       - DOWNLOAD_DELAY_ENABLED=true
       - DOWNLOAD_DELAY_MIN_MS=10000
-      - DOWNLOAD_DELAY_MAX_MS=120000
+      # - DOWNLOAD_DELAY_MAX_MS=120000
+      - DOWNLOAD_DELAY_MAX_MS=12000
       - REQUEST_TIMEOUT_MS=30000
       - RATE_LIMIT_WINDOW_MS=60000
       - RATE_LIMIT_MAX_REQUESTS=100
       - CORS_ORIGINS=*
+      - REDIS_URL=redis://redis:6379
     depends_on:
       rustfs-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_started
     restart: unless-stopped
     networks:
       - delineate-network
@@ -76,6 +80,16 @@ services:
     networks:
       - delineate-network
 
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - delineate-network
+
   delineate-dashboard:
     build:
       context: ../frontend
@@ -99,3 +113,4 @@ networks:
 volumes:
   rustfs-data:
   rustfs-logs:
+  redis-data:

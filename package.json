@@ -29,6 +29,7 @@
     "@sentry/node": "^10.30.0",
     "hono": "^4.10.8",
     "hono-rate-limiter": "^0.4.2",
+    "ioredis": "^5.8.2",
     "zod": "^4.1.13"
   },
   "devDependencies": {
