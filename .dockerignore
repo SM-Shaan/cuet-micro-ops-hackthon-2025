@@ -4,5 +4,4 @@ npm-debug.log
 .gitignore
 .env
 .env.*
-docker
 *.md

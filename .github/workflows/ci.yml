@@ -2,19 +2,31 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
-    name: Lint
+    name: Lint & Format
     runs-on: ubuntu-24.04
-    container:
-      image: node:24-slim
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -29,11 +41,15 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-24.04
     needs: lint
-    container:
-      image: node:24-slim
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -52,6 +68,7 @@ jobs:
           RATE_LIMIT_WINDOW_MS: "60000"
           RATE_LIMIT_MAX_REQUESTS: "100"
           CORS_ORIGINS: "*"
+          DOWNLOAD_DELAY_ENABLED: "false"
 
   build:
     name: Build Docker Image
@@ -70,6 +87,43 @@ jobs:
           context: .
           file: docker/Dockerfile.prod
           push: false
-          tags: delineate-hackathon-challenge:${{ github.sha }}
+          tags: |
+            delineate-hackathon-challenge:${{ github.sha }}
+            delineate-hackathon-challenge:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-24.04
+    needs: lint
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high || true
+        continue-on-error: true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
