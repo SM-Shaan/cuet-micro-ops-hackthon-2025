@@ -80,6 +80,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
 
       # Login to DockerHub
       - name: Login to DockerHub
@@ -139,8 +140,7 @@ jobs:
         run: |
           git config --global user.email "$ADMIN_MAIL"
           git config --global user.name "$ADMIN_NAME"
-          git checkout main
-          git pull origin main
+          git checkout -B main origin/main
           git add docker/compose.prod.yml
           git commit -m "ci: update production Docker image tags [skip ci]" || true
           git push https://$GH_TOKEN@github.com/${{ github.repository }} main
