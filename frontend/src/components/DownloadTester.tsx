@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createSpan, getCurrentTraceId } from "../lib/tracing";
 import { addBreadcrumb, captureError } from "../lib/sentry";
 import { generateUUID } from "../lib/uuid";
@@ -6,11 +6,13 @@ import { generateUUID } from "../lib/uuid";
 interface DownloadJob {
   id: string;
   fileId: number;
+  userId: string;
   status: "pending" | "processing" | "completed" | "failed";
   progress: number;
   startedAt: Date;
   completedAt?: Date;
   processingTimeMs?: number;
+  downloadUrl?: string;
   error?: string;
 }
 
@@ -18,6 +20,7 @@ export function DownloadTester() {
   const [fileId, setFileId] = useState(70000);
   const [loading, setLoading] = useState(false);
   const [currentJob, setCurrentJob] = useState<DownloadJob | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const emitMetric = (type: string, value: number) => {
     window.dispatchEvent(
@@ -29,16 +32,67 @@ export function DownloadTester() {
     window.dispatchEvent(new CustomEvent("downloadJobUpdate", { detail: job }));
   };
 
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  const pollStatus = async (userId: string, job: DownloadJob) => {
+    try {
+      const response = await fetch(`/api/v1/download/status/${userId}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Job not found, might have expired
+          return;
+        }
+        throw new Error("Failed to fetch status");
+      }
+
+      const status = await response.json();
+
+      const updatedJob: DownloadJob = {
+        ...job,
+        status: status.status,
+        progress: status.progress || 0,
+        processingTimeMs: status.processingTimeMs,
+        downloadUrl: status.downloadUrl,
+        error: status.error || status.message,
+      };
+
+      if (status.status === "completed" || status.status === "failed") {
+        updatedJob.completedAt = new Date();
+        stopPolling();
+        setLoading(false);
+        emitMetric("activeJobs", -1);
+        emitMetric("responseTime", status.processingTimeMs || 0);
+
+        if (status.status === "failed") {
+          emitMetric("error", 1);
+        }
+      }
+
+      setCurrentJob(updatedJob);
+      emitJobUpdate(updatedJob);
+    } catch (err) {
+      console.error("Polling error:", err);
+    }
+  };
+
   const startDownload = async () => {
     if (loading) return;
 
+    stopPolling();
     setLoading(true);
     const startTime = Date.now();
+    const userId = `user-${generateUUID().slice(0, 8)}`;
 
     const job: DownloadJob = {
       id: generateUUID(),
       fileId,
-      status: "processing",
+      userId,
+      status: "pending",
       progress: 0,
       startedAt: new Date(),
     };
@@ -49,7 +103,7 @@ export function DownloadTester() {
     emitMetric("request", 1);
 
     try {
-      addBreadcrumb("Starting download", "download", { fileId });
+      addBreadcrumb("Starting download", "download", { fileId, userId });
 
       const result = await createSpan(
         "download-start",
@@ -57,7 +111,7 @@ export function DownloadTester() {
           const response = await fetch("/api/v1/download/start", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ file_id: fileId }),
+            body: JSON.stringify({ file_id: fileId, user_id: userId }),
           });
 
           if (!response.ok) {
@@ -69,29 +123,32 @@ export function DownloadTester() {
         },
         {
           "download.file_id": fileId,
+          "download.user_id": userId,
           "download.trace_id": getCurrentTraceId() || "",
         },
       );
 
-      const completedJob: DownloadJob = {
+      // Update job with server response
+      const queuedJob: DownloadJob = {
         ...job,
-        status: result.status === "completed" ? "completed" : "failed",
-        progress: 100,
-        completedAt: new Date(),
-        processingTimeMs: result.processingTimeMs,
-        error: result.status === "failed" ? result.message : undefined,
+        id: result.jobId,
+        status: "processing",
+        progress: 0,
       };
 
-      setCurrentJob(completedJob);
-      emitJobUpdate(completedJob);
-      emitMetric("responseTime", result.processingTimeMs);
+      setCurrentJob(queuedJob);
+      emitJobUpdate(queuedJob);
 
-      if (result.status === "failed") {
-        emitMetric("error", 1);
-      }
+      // Start polling for status updates
+      pollIntervalRef.current = setInterval(() => {
+        pollStatus(userId, queuedJob);
+      }, 1000);
+
+      // Initial poll
+      setTimeout(() => pollStatus(userId, queuedJob), 500);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      captureError(error, { fileId });
+      captureError(error, { fileId, userId });
 
       const failedJob: DownloadJob = {
         ...job,
@@ -106,7 +163,6 @@ export function DownloadTester() {
       emitJobUpdate(failedJob);
       emitMetric("responseTime", failedJob.processingTimeMs || 0);
       emitMetric("error", 1);
-    } finally {
       setLoading(false);
       emitMetric("activeJobs", -1);
     }
@@ -225,12 +281,20 @@ export function DownloadTester() {
               ID: {currentJob.id.slice(0, 8)}...
             </div>
 
-            {currentJob.status === "processing" && (
-              <div className="w-full bg-gray-600 rounded-full h-2">
-                <div
-                  className="bg-blue-500 h-2 rounded-full animate-pulse"
-                  style={{ width: "50%" }}
-                />
+            {/* Progress Bar */}
+            {(currentJob.status === "processing" ||
+              currentJob.status === "pending") && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-gray-400">
+                  <span>Progress</span>
+                  <span>{currentJob.progress}%</span>
+                </div>
+                <div className="w-full bg-gray-600 rounded-full h-2">
+                  <div
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${currentJob.progress}%` }}
+                  />
+                </div>
               </div>
             )}
 
@@ -241,9 +305,35 @@ export function DownloadTester() {
               </div>
             )}
 
-            {currentJob.error && (
-              <div className="text-sm text-red-400 bg-red-500/10 p-2 rounded">
-                {currentJob.error}
+            {/* Download URL */}
+            {currentJob.downloadUrl && currentJob.status === "completed" && (
+              <div className="text-sm">
+                <a
+                  href={currentJob.downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 underline"
+                >
+                  Download File
+                </a>
+              </div>
+            )}
+
+            {/* Show message for completed jobs */}
+            {currentJob.status === "completed" && !currentJob.downloadUrl && (
+              <div className="text-sm text-green-400 bg-green-500/10 p-2 rounded">
+                Job completed successfully
+              </div>
+            )}
+
+            {/* Show error/message for failed jobs */}
+            {currentJob.status === "failed" && currentJob.error && (
+              <div className="text-sm text-yellow-400 bg-yellow-500/10 p-2 rounded">
+                <div className="font-medium">Job completed with message:</div>
+                <div className="mt-1">{currentJob.error}</div>
+                <div className="text-xs text-gray-400 mt-1">
+                  (File may not exist in S3 storage)
+                </div>
               </div>
             )}
 
@@ -262,6 +352,10 @@ export function DownloadTester() {
           </p>
           <p>
             Trace IDs are propagated to the backend for distributed tracing.
+          </p>
+          <p className="text-green-500/70 mt-1">
+            Mock mode: File IDs divisible by 7 (e.g., 70000, 70007) succeed.
+            Other IDs will show "File not found".
           </p>
         </div>
       </div>
