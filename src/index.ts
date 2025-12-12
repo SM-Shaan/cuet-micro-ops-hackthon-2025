@@ -379,10 +379,6 @@ const healthRoute = createRoute({
   },
 });
 
-app.openapi(rootRoute, (c) => {
-  return c.json({ message: "Hello Hono!" }, 200);
-});
-
 // Debug route to verify Sentry is working
 const debugSentryRoute = createRoute({
   method: "get",
@@ -400,6 +396,11 @@ const debugSentryRoute = createRoute({
       },
     },
   },
+});
+
+// Route handlers
+app.openapi(rootRoute, (c) => {
+  return c.json({ message: "Hello Hono!" }, 200);
 });
 
 app.openapi(debugSentryRoute, (c) => {
