@@ -3,11 +3,13 @@ import { useState, useEffect } from "react";
 interface DownloadJob {
   id: string;
   fileId: number;
+  userId?: string;
   status: "pending" | "processing" | "completed" | "failed";
   progress: number;
   startedAt: Date;
   completedAt?: Date;
   processingTimeMs?: number;
+  downloadUrl?: string;
   error?: string;
 }
 
