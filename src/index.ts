@@ -4,7 +4,6 @@ import { Sentry, shutdownOtel } from "./instrument.ts";
 
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { serve } from "@hono/node-server";
-import Redis from "ioredis";
 import type { ServerType } from "@hono/node-server";
 import { httpInstrumentationMiddleware } from "@hono/otel";
 import { sentry } from "@hono/sentry";
@@ -14,6 +13,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { timeout } from "hono/timeout";
 import { rateLimiter } from "hono-rate-limiter";
+import Redis from "ioredis";
 
 // Helper for optional URL that treats empty string as undefined
 const optionalUrl = z
@@ -74,32 +74,37 @@ const s3Client = new S3Client({
 
 // Redis Client with fallback support
 let redisConnected = false;
-const redis = new Redis(env.REDIS_URL, {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+const redis: Redis = new Redis(env.REDIS_URL, {
   maxRetriesPerRequest: 3,
   retryDelayOnFailover: 100,
   lazyConnect: true,
   enableOfflineQueue: false, // Don't queue commands when disconnected
 });
 
-redis.on("error", (err) => {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+redis.on("error", (err: Error) => {
   if (redisConnected) {
     console.error("[Redis] Connection error:", err.message);
   }
   redisConnected = false;
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
 redis.on("connect", () => {
   redisConnected = true;
   console.log("[Redis] Connected to", env.REDIS_URL);
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
 redis.on("ready", () => {
   redisConnected = true;
   console.log("[Redis] Ready");
 });
 
 // Connect to Redis immediately (don't wait for first command)
-redis.connect().catch((err) => {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+redis.connect().catch((err: Error) => {
   console.error("[Redis] Initial connection failed:", err.message);
 });
 
@@ -273,11 +278,24 @@ const DownloadStartResponseSchema = z
   .object({
     jobId: z.string().openapi({ description: "Unique job identifier" }),
     userId: z.string().openapi({ description: "User ID" }),
-    fileId: z.number().int().openapi({ description: "File ID being processed" }),
-    status: z.enum(["queued", "processing"]).openapi({ description: "Job status" }),
-    progress: z.number().int().min(0).max(100).optional().openapi({ description: "Progress percentage" }),
+    fileId: z
+      .number()
+      .int()
+      .openapi({ description: "File ID being processed" }),
+    status: z
+      .enum(["queued", "processing"])
+      .openapi({ description: "Job status" }),
+    progress: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .optional()
+      .openapi({ description: "Progress percentage" }),
     message: z.string().openapi({ description: "Status message" }),
-    pollUrl: z.string().openapi({ description: "URL to poll for status updates" }),
+    pollUrl: z
+      .string()
+      .openapi({ description: "URL to poll for status updates" }),
   })
   .openapi("DownloadStartResponse");
 
@@ -286,17 +304,44 @@ const DownloadStatusResponseSchema = z
   .object({
     jobId: z.string().openapi({ description: "Unique job identifier" }),
     userId: z.string().openapi({ description: "User ID" }),
-    fileId: z.number().int().openapi({ description: "File ID being processed" }),
-    status: z.enum(["queued", "processing", "completed", "failed"]).openapi({ description: "Job status" }),
-    progress: z.number().int().min(0).max(100).openapi({ description: "Progress percentage (0-100)" }),
+    fileId: z
+      .number()
+      .int()
+      .openapi({ description: "File ID being processed" }),
+    status: z
+      .enum(["queued", "processing", "completed", "failed"])
+      .openapi({ description: "Job status" }),
+    progress: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .openapi({ description: "Progress percentage (0-100)" }),
     createdAt: z.number().openapi({ description: "Job creation timestamp" }),
     updatedAt: z.number().openapi({ description: "Last update timestamp" }),
-    completedAt: z.number().nullable().openapi({ description: "Completion timestamp" }),
-    downloadUrl: z.string().nullable().openapi({ description: "Presigned download URL if completed" }),
-    size: z.number().int().nullable().openapi({ description: "File size in bytes" }),
-    processingTimeMs: z.number().int().nullable().openapi({ description: "Processing time in ms" }),
+    completedAt: z
+      .number()
+      .nullable()
+      .openapi({ description: "Completion timestamp" }),
+    downloadUrl: z
+      .string()
+      .nullable()
+      .openapi({ description: "Presigned download URL if completed" }),
+    size: z
+      .number()
+      .int()
+      .nullable()
+      .openapi({ description: "File size in bytes" }),
+    processingTimeMs: z
+      .number()
+      .int()
+      .nullable()
+      .openapi({ description: "Processing time in ms" }),
     message: z.string().nullable().openapi({ description: "Status message" }),
-    error: z.string().nullable().openapi({ description: "Error message if failed" }),
+    error: z
+      .string()
+      .nullable()
+      .openapi({ description: "Error message if failed" }),
   })
   .openapi("DownloadStatusResponse");
 
@@ -402,15 +447,18 @@ interface DownloadJob {
 }
 
 // Redis key helper
-const getRedisKey = (userId: string): string => `${env.REDIS_KEY_PREFIX}${userId}`;
+const getRedisKey = (userId: string): string =>
+  `${env.REDIS_KEY_PREFIX}${userId}`;
 
 // Redis job store helper functions
 const jobStore = {
   async get(userId: string): Promise<DownloadJob | null> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const data = await redis.get(getRedisKey(userId));
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       return data ? (JSON.parse(data) as DownloadJob) : null;
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(`[Redis] Error getting job for userId=${userId}:`, err);
       return null;
     }
@@ -418,20 +466,22 @@ const jobStore = {
 
   async set(userId: string, job: DownloadJob): Promise<void> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await redis.setex(
         getRedisKey(userId),
         env.REDIS_JOB_TTL_SECONDS,
-        JSON.stringify(job)
+        JSON.stringify(job),
       );
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(`[Redis] Error setting job for userId=${userId}:`, err);
     }
   },
 
   async delete(userId: string): Promise<void> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await redis.del(getRedisKey(userId));
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(`[Redis] Error deleting job for userId=${userId}:`, err);
     }
   },
@@ -472,7 +522,7 @@ const processDownloadJob = async (userId: string): Promise<void> => {
   const progressInterval = setInterval(() => {
     const elapsed = Date.now() - startTime;
     const progress = Math.min(Math.floor((elapsed / delayMs) * 100), 99);
-    jobStore.updateProgress(userId, progress).catch((err) => {
+    jobStore.updateProgress(userId, progress).catch((err: unknown) => {
       console.error(`[Download] Progress update error: ${String(err)}`);
     });
   }, 1000);
@@ -802,10 +852,14 @@ const downloadStatusRoute = createRoute({
   path: "/v1/download/status/{userId}",
   tags: ["Download"],
   summary: "Get download job status by user ID",
-  description: "Poll this endpoint to check the status of a user's download job. Returns progress, status, and downloadUrl when complete.",
+  description:
+    "Poll this endpoint to check the status of a user's download job. Returns progress, status, and downloadUrl when complete.",
   request: {
     params: z.object({
-      userId: z.string().min(1).openapi({ description: "User ID to check status for" }),
+      userId: z
+        .string()
+        .min(1)
+        .openapi({ description: "User ID to check status for" }),
     }),
   },
   responses: {
@@ -835,7 +889,10 @@ app.openapi(downloadStartRoute, async (c) => {
   // Check if user already has an active job (idempotency) - Redis lookup
   const existingJob = await jobStore.get(user_id);
 
-  if (existingJob && (existingJob.status === "queued" || existingJob.status === "processing")) {
+  if (
+    existingJob &&
+    (existingJob.status === "queued" || existingJob.status === "processing")
+  ) {
     // Return existing job (idempotent)
     console.log(
       `[Download] Returning existing job for userId=${user_id} jobId=${existingJob.jobId} status=${existingJob.status}`,
@@ -845,7 +902,7 @@ app.openapi(downloadStartRoute, async (c) => {
         jobId: existingJob.jobId,
         userId: user_id,
         fileId: existingJob.fileId,
-        status: existingJob.status as "queued" | "processing",
+        status: existingJob.status,
         progress: existingJob.progress,
         message: "Download job already in progress",
         pollUrl: `/v1/download/status/${user_id}`,
@@ -874,7 +931,7 @@ app.openapi(downloadStartRoute, async (c) => {
   );
 
   // Start background processing (non-blocking - don't await!)
-  processDownloadJob(user_id).catch((err) => {
+  processDownloadJob(user_id).catch((err: unknown) => {
     console.error(`[Download] Background processing error: ${String(err)}`);
   });
 
@@ -961,6 +1018,7 @@ const gracefulShutdown = (server: ServerType) => (signal: string) => {
       })
       .finally(() => {
         // Disconnect Redis
+        /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
         redis
           .quit()
           .then(() => {
@@ -975,6 +1033,7 @@ const gracefulShutdown = (server: ServerType) => (signal: string) => {
             console.log("S3 client destroyed");
             console.log("Graceful shutdown completed");
           });
+        /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
       });
   });
 };

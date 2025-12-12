@@ -42,6 +42,7 @@ The download microservice handles file operations with variable processing times
 ### Solution: Async Polling Pattern
 
 This project implements an **async/polling architecture** where:
+
 - Client initiates download → receives `jobId` immediately (< 100ms)
 - Background process handles the actual work
 - Client polls for status updates with progress feedback
@@ -194,38 +195,38 @@ Client              Gateway           API                Redis
 
 ### Backend
 
-| Technology               | Version  | Purpose                              |
-| ------------------------ | -------- | ------------------------------------ |
-| Node.js                  | 24+      | Runtime (ESM modules)                |
-| Hono                     | 4.10.8   | Web framework                        |
-| @hono/zod-openapi        | 0.19.6   | OpenAPI 3.0 spec generation          |
-| @scalar/hono-api-reference| 0.5.175 | Interactive API documentation        |
-| Zod                      | 4.1.13   | Schema validation                    |
-| ioredis                  | 5.8.2    | Redis client                         |
-| @aws-sdk/client-s3       | 3.821.0  | S3 operations                        |
-| @sentry/node             | 10.30.0  | Error tracking                       |
-| @opentelemetry/sdk-node  | 0.202.0  | Distributed tracing                  |
+| Technology                 | Version | Purpose                       |
+| -------------------------- | ------- | ----------------------------- |
+| Node.js                    | 24+     | Runtime (ESM modules)         |
+| Hono                       | 4.10.8  | Web framework                 |
+| @hono/zod-openapi          | 0.19.6  | OpenAPI 3.0 spec generation   |
+| @scalar/hono-api-reference | 0.5.175 | Interactive API documentation |
+| Zod                        | 4.1.13  | Schema validation             |
+| ioredis                    | 5.8.2   | Redis client                  |
+| @aws-sdk/client-s3         | 3.821.0 | S3 operations                 |
+| @sentry/node               | 10.30.0 | Error tracking                |
+| @opentelemetry/sdk-node    | 0.202.0 | Distributed tracing           |
 
 ### Frontend
 
-| Technology               | Version  | Purpose                              |
-| ------------------------ | -------- | ------------------------------------ |
-| React                    | 18.3.1   | UI framework                         |
-| Vite                     | 6.0.3    | Build tool                           |
-| Tailwind CSS             | 3.4.16   | Styling                              |
-| React Router DOM         | 7.0.2    | Routing                              |
-| @sentry/react            | 10.30.0  | Error tracking                       |
-| @opentelemetry/sdk-trace-web | 2.0.0 | Browser tracing                     |
+| Technology                   | Version | Purpose         |
+| ---------------------------- | ------- | --------------- |
+| React                        | 18.3.1  | UI framework    |
+| Vite                         | 6.0.3   | Build tool      |
+| Tailwind CSS                 | 3.4.16  | Styling         |
+| React Router DOM             | 7.0.2   | Routing         |
+| @sentry/react                | 10.30.0 | Error tracking  |
+| @opentelemetry/sdk-trace-web | 2.0.0   | Browser tracing |
 
 ### Infrastructure
 
-| Technology               | Purpose                              |
-| ------------------------ | ------------------------------------ |
-| Docker & Docker Compose  | Containerization & orchestration     |
-| Nginx                    | API gateway / reverse proxy          |
-| Redis                    | Job state storage & caching          |
-| RustFS (MinIO-compatible)| S3-compatible object storage         |
-| Jaeger                   | Distributed trace collection & UI    |
+| Technology                | Purpose                           |
+| ------------------------- | --------------------------------- |
+| Docker & Docker Compose   | Containerization & orchestration  |
+| Nginx                     | API gateway / reverse proxy       |
+| Redis                     | Job state storage & caching       |
+| RustFS (MinIO-compatible) | S3-compatible object storage      |
+| Jaeger                    | Distributed trace collection & UI |
 
 ---
 
@@ -295,11 +296,13 @@ app.use(cors({ origin: CORS_ORIGINS }));
 app.use(timeout(REQUEST_TIMEOUT_MS));
 
 // Rate limiting
-app.use(rateLimiter({
-  windowMs: RATE_LIMIT_WINDOW_MS,
-  limit: RATE_LIMIT_MAX_REQUESTS,
-  keyGenerator: (c) => c.req.header("x-forwarded-for") || "unknown"
-}));
+app.use(
+  rateLimiter({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    limit: RATE_LIMIT_MAX_REQUESTS,
+    keyGenerator: (c) => c.req.header("x-forwarded-for") || "unknown",
+  }),
+);
 
 // Request ID tracing
 app.use("*", async (c, next) => {
@@ -347,18 +350,18 @@ async function processDownloadJob(userId: string): Promise<void> {
 // TTL: REDIS_JOB_TTL_SECONDS (default: 3600)
 
 interface JobData {
-  jobId: string;           // UUID
-  userId: string;          // User identifier (idempotency key)
-  fileId: number;          // Requested file ID
-  status: JobStatus;       // "queued" | "processing" | "completed" | "failed"
-  progress: number;        // 0-100
-  createdAt: number;       // Unix timestamp
-  updatedAt: number;       // Unix timestamp
-  completedAt?: number;    // Unix timestamp (when finished)
-  downloadUrl?: string;    // Presigned S3 URL (when completed)
-  size?: number;           // File size in bytes
+  jobId: string; // UUID
+  userId: string; // User identifier (idempotency key)
+  fileId: number; // Requested file ID
+  status: JobStatus; // "queued" | "processing" | "completed" | "failed"
+  progress: number; // 0-100
+  createdAt: number; // Unix timestamp
+  updatedAt: number; // Unix timestamp
+  completedAt?: number; // Unix timestamp (when finished)
+  downloadUrl?: string; // Presigned S3 URL (when completed)
+  size?: number; // File size in bytes
   processingTimeMs?: number; // Total processing duration
-  error?: string;          // Error message (when failed)
+  error?: string; // Error message (when failed)
 }
 ```
 
@@ -369,7 +372,7 @@ interface JobData {
 await redis.setex(
   `${REDIS_KEY_PREFIX}${userId}`,
   REDIS_JOB_TTL_SECONDS,
-  JSON.stringify(jobData)
+  JSON.stringify(jobData),
 );
 
 // Get job status
@@ -390,9 +393,9 @@ const s3Client = new S3Client({
   endpoint: S3_ENDPOINT,
   credentials: {
     accessKeyId: S3_ACCESS_KEY_ID,
-    secretAccessKey: S3_SECRET_ACCESS_KEY
+    secretAccessKey: S3_SECRET_ACCESS_KEY,
   },
-  forcePathStyle: S3_FORCE_PATH_STYLE
+  forcePathStyle: S3_FORCE_PATH_STYLE,
 });
 
 // Check file availability
@@ -400,7 +403,7 @@ async function checkS3Object(fileId: number): Promise<boolean> {
   const key = `downloads/${fileId}.zip`;
   const command = new HeadObjectCommand({
     Bucket: S3_BUCKET_NAME,
-    Key: key
+    Key: key,
   });
 
   try {
@@ -417,7 +420,7 @@ async function generatePresignedUrl(fileId: number): Promise<string> {
   const key = `downloads/${fileId}.zip`;
   const command = new GetObjectCommand({
     Bucket: S3_BUCKET_NAME,
-    Key: key
+    Key: key,
   });
 
   return getSignedUrl(s3Client, command, { expiresIn: 3600 });
@@ -655,9 +658,9 @@ import * as Sentry from "@sentry/node";
 const sdk = new NodeSDK({
   serviceName: "delineate-download-service",
   traceExporter: new OTLPTraceExporter({
-    url: `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`
+    url: `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
   }),
-  instrumentations: [new HttpInstrumentation()]
+  instrumentations: [new HttpInstrumentation()],
 });
 
 sdk.start();
@@ -666,7 +669,7 @@ sdk.start();
 Sentry.init({
   dsn: SENTRY_DSN,
   environment: NODE_ENV,
-  tracesSampleRate: 1.0
+  tracesSampleRate: 1.0,
 });
 ```
 
@@ -681,14 +684,12 @@ import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 
 const provider = new WebTracerProvider();
 provider.addSpanProcessor(
-  new BatchSpanProcessor(
-    new OTLPTraceExporter({ url: "/api/v1/traces" })
-  )
+  new BatchSpanProcessor(new OTLPTraceExporter({ url: "/api/v1/traces" })),
 );
 
 // Auto-instrument fetch requests
 registerInstrumentations({
-  instrumentations: [new FetchInstrumentation()]
+  instrumentations: [new FetchInstrumentation()],
 });
 
 // Helper functions
@@ -708,12 +709,12 @@ Sentry.init({
     Sentry.browserTracingIntegration(),
     Sentry.replayIntegration({
       maskAllText: false,
-      blockAllMedia: false
-    })
+      blockAllMedia: false,
+    }),
   ],
   tracesSampleRate: 1.0,
   replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0
+  replaysOnErrorSampleRate: 1.0,
 });
 ```
 
@@ -781,8 +782,8 @@ services:
   delineate-jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
-      - "16686:16686"  # UI
-      - "4318:4318"    # OTLP HTTP
+      - "16686:16686" # UI
+      - "4318:4318" # OTLP HTTP
 ```
 
 ### Production Setup (`docker/compose.prod.yml`)
@@ -912,7 +913,7 @@ function DownloadTester() {
     const response = await fetch("/api/v1/download/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: fileId, user_id: userId })
+      body: JSON.stringify({ file_id: fileId, user_id: userId }),
     });
 
     const data = await response.json();
@@ -931,7 +932,9 @@ function DownloadTester() {
     setJob(data);
 
     // Dispatch event for DownloadJobs component
-    window.dispatchEvent(new CustomEvent("downloadJobUpdate", { detail: data }));
+    window.dispatchEvent(
+      new CustomEvent("downloadJobUpdate", { detail: data }),
+    );
 
     // Stop polling when complete
     if (data.status === "completed" || data.status === "failed") {
@@ -942,7 +945,7 @@ function DownloadTester() {
   function startPolling() {
     setPolling(true);
     const interval = setInterval(() => {
-      pollStatus().then(job => {
+      pollStatus().then((job) => {
         if (job.status === "completed" || job.status === "failed") {
           clearInterval(interval);
         }
@@ -952,16 +955,17 @@ function DownloadTester() {
 
   return (
     <div>
-      <input value={fileId} onChange={e => setFileId(Number(e.target.value))} />
+      <input
+        value={fileId}
+        onChange={(e) => setFileId(Number(e.target.value))}
+      />
       <button onClick={startDownload}>Start Download</button>
 
       {job && (
         <div>
           <p>Status: {job.status}</p>
           <progress value={job.progress} max={100} />
-          {job.downloadUrl && (
-            <a href={job.downloadUrl}>Download File</a>
-          )}
+          {job.downloadUrl && <a href={job.downloadUrl}>Download File</a>}
         </div>
       )}
     </div>
@@ -978,7 +982,10 @@ const MAX_JOBS = 50;
 
 function saveJob(job: JobStatus) {
   const jobs = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  const updated = [job, ...jobs.filter(j => j.jobId !== job.jobId)].slice(0, MAX_JOBS);
+  const updated = [job, ...jobs.filter((j) => j.jobId !== job.jobId)].slice(
+    0,
+    MAX_JOBS,
+  );
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 }
 
@@ -1029,15 +1036,18 @@ app.onError((err, c) => {
   Sentry.captureException(err, {
     tags: {
       requestId: c.req.header("x-request-id"),
-      path: c.req.path
-    }
+      path: c.req.path,
+    },
   });
 
-  return c.json({
-    error: "Internal server error",
-    message: NODE_ENV === "development" ? err.message : undefined,
-    traceId: c.res.headers.get("x-trace-id")
-  }, 500);
+  return c.json(
+    {
+      error: "Internal server error",
+      message: NODE_ENV === "development" ? err.message : undefined,
+      traceId: c.res.headers.get("x-trace-id"),
+    },
+    500,
+  );
 });
 ```
 
@@ -1054,14 +1064,14 @@ function ErrorLog() {
       const entry = {
         message: event.message,
         timestamp: Date.now(),
-        traceId: sessionStorage.getItem("lastTraceId")
+        traceId: sessionStorage.getItem("lastTraceId"),
       };
 
-      setErrors(prev => [entry, ...prev].slice(0, 100));
+      setErrors((prev) => [entry, ...prev].slice(0, 100));
 
       // Report to Sentry
       Sentry.captureException(event.error, {
-        tags: { traceId: entry.traceId }
+        tags: { traceId: entry.traceId },
       });
     };
 
@@ -1094,7 +1104,7 @@ if (existingJob) {
   if (job.status !== "completed" && job.status !== "failed") {
     return c.json({
       ...job,
-      message: "Existing job found. Continue polling for status."
+      message: "Existing job found. Continue polling for status.",
     });
   }
 }
@@ -1105,14 +1115,16 @@ if (existingJob) {
 ```typescript
 // src/instrument.ts
 process.on("SIGTERM", () => {
-  sdk.shutdown()
+  sdk
+    .shutdown()
     .then(() => console.log("Tracing terminated"))
     .catch((error) => console.error("Error terminating tracing", error))
     .finally(() => process.exit(0));
 });
 
 process.on("SIGINT", () => {
-  sdk.shutdown()
+  sdk
+    .shutdown()
     .then(() => console.log("Tracing terminated"))
     .catch((error) => console.error("Error terminating tracing", error))
     .finally(() => process.exit(0));
@@ -1135,16 +1147,16 @@ This architecture addresses the core problem of long-running downloads by:
 
 ### Key Design Patterns
 
-| Pattern              | Implementation                                    |
-| -------------------- | ------------------------------------------------- |
-| Async Polling        | Start job → poll status → get result              |
-| Idempotency Key      | `user_id` prevents duplicate job creation         |
-| Request ID Tracing   | X-Request-ID header across all services           |
-| Distributed Tracing  | OpenTelemetry spans propagate context             |
-| Error Correlation    | Sentry errors tagged with trace IDs               |
-| Health Checks        | HTTP `/health` + Docker HEALTHCHECK               |
-| Graceful Shutdown    | SIGTERM/SIGINT handlers clean up resources        |
-| Rate Limiting        | Per-IP request throttling via middleware          |
+| Pattern             | Implementation                             |
+| ------------------- | ------------------------------------------ |
+| Async Polling       | Start job → poll status → get result       |
+| Idempotency Key     | `user_id` prevents duplicate job creation  |
+| Request ID Tracing  | X-Request-ID header across all services    |
+| Distributed Tracing | OpenTelemetry spans propagate context      |
+| Error Correlation   | Sentry errors tagged with trace IDs        |
+| Health Checks       | HTTP `/health` + Docker HEALTHCHECK        |
+| Graceful Shutdown   | SIGTERM/SIGINT handlers clean up resources |
+| Rate Limiting       | Per-IP request throttling via middleware   |
 
 ### Environment Configuration
 
