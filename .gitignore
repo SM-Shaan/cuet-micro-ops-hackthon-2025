@@ -10,7 +10,8 @@
 
 # deps
 node_modules/
-
+docs/
+assets/
 # env
 .env
 .env.production
@@ -27,3 +28,6 @@ lerna-debug.log*
 # misc
 .DS_Store
 data/
+
+# issue tracking
+doc/issue.md

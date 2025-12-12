@@ -1,5 +1,7 @@
 # Delineate Hackathon Challenge - CUET Fest 2025
 
+[![CI](https://github.com/bongodev/cuet-micro-ops-hackthon-2025/actions/workflows/ci.yml/badge.svg)](https://github.com/bongodev/cuet-micro-ops-hackthon-2025/actions/workflows/ci.yml)
+
 ## The Scenario
 
 This microservice simulates a **real-world file download system** where processing times vary significantly:
@@ -532,6 +534,13 @@ npm run docker:prod  # Start with Docker (production)
 .
 ├── src/
 │   └── index.ts          # Main application entry point
+├── frontend/             # Observability Dashboard (React + Vite)
+│   ├── src/
+│   │   ├── components/   # React components
+│   │   ├── hooks/        # Custom React hooks
+│   │   └── lib/          # Sentry & OpenTelemetry setup
+│   ├── Dockerfile        # Frontend Docker build
+│   └── package.json
 ├── scripts/
 │   ├── e2e-test.ts       # E2E test suite
 │   └── run-e2e.ts        # Test runner with server management
@@ -543,6 +552,7 @@ npm run docker:prod  # Start with Docker (production)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml        # GitHub Actions CI pipeline
+├── ARCHITECTURE.md       # Long-running download architecture design
 ├── package.json
 ├── tsconfig.json
 └── eslint.config.mjs
@@ -557,6 +567,115 @@ npm run docker:prod  # Start with Docker (production)
 - Input validation with Zod schemas
 - Path traversal prevention for S3 keys
 - Graceful shutdown handling
+
+## CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and deployment.
+
+### Pipeline Stages
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│    Lint     │───▶│    Test     │───▶│    Build    │    │  Security   │
+│  (ESLint,   │    │   (E2E)     │    │  (Docker)   │    │   (CodeQL)  │
+│  Prettier)  │    │             │    │             │    │             │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+```
+
+### Features
+
+- **Triggers**: Runs on push to `main`/`master` and on pull requests
+- **Caching**: npm dependencies are cached for faster builds
+- **Docker Build**: Builds production Docker image with layer caching
+- **Security Scanning**: CodeQL analysis and npm audit for vulnerability detection
+- **Concurrency**: Cancels redundant runs on the same branch
+
+### Running Tests Locally
+
+Before pushing changes, run the following commands locally:
+
+```bash
+# Run linting
+npm run lint
+
+# Check formatting
+npm run format:check
+
+# Run E2E tests
+npm run test:e2e
+
+# Build Docker image
+npm run docker:prod
+```
+
+### For Contributors
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Make your changes and ensure all tests pass
+4. Push to your fork and create a Pull Request
+5. Wait for CI checks to pass before requesting review
+
+## Observability Dashboard
+
+The project includes a React-based observability dashboard located in the `frontend/` directory.
+
+### Features
+
+| Feature             | Description                                    |
+| ------------------- | ---------------------------------------------- |
+| Health Status       | Real-time API health monitoring                |
+| Download Jobs       | Track download job status and progress         |
+| Error Log           | View errors captured by Sentry                 |
+| Trace Viewer        | Link to Jaeger UI for distributed tracing      |
+| Performance Metrics | API response times and success rates           |
+| Download Tester     | Test download functionality with trace context |
+
+### Running the Dashboard
+
+```bash
+# With Docker (recommended)
+npm run docker:dev
+
+# Access points:
+# - Dashboard: http://localhost:5173
+# - API: http://localhost:3000
+# - Jaeger UI: http://localhost:16686
+# - RustFS Console: http://localhost:9001
+```
+
+### Sentry Setup
+
+1. Create a project at [sentry.io](https://sentry.io)
+2. Get your DSN from Project Settings > Client Keys
+3. Add to your `.env` file:
+   ```env
+   SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
+   ```
+
+### OpenTelemetry Configuration
+
+Traces are automatically sent to Jaeger when running with Docker. The dashboard propagates trace context to the backend for end-to-end tracing:
+
+```
+Frontend (trace-id: abc123)
+    │
+    ▼ traceparent header
+Backend logs: [trace_id=abc123]
+    │
+    ▼
+Jaeger UI: View complete trace
+```
+
+### Dashboard Environment Variables
+
+Create `frontend/.env` from the example:
+
+```env
+VITE_SENTRY_DSN=           # Your Sentry DSN
+VITE_OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+VITE_JAEGER_UI_URL=http://localhost:16686
+```
 
 ## License
 

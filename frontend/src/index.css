@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #1a1a2e;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+@layer components {
+  .card {
+    @apply bg-gray-800 rounded-lg p-6 shadow-lg;
+  }
+
+  .status-badge {
+    @apply px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  .status-healthy {
+    @apply bg-green-500/20 text-green-400;
+  }
+
+  .status-unhealthy {
+    @apply bg-red-500/20 text-red-400;
+  }
+
+  .status-pending {
+    @apply bg-yellow-500/20 text-yellow-400;
+  }
+
+  .status-processing {
+    @apply bg-blue-500/20 text-blue-400;
+  }
+
+  .status-completed {
+    @apply bg-green-500/20 text-green-400;
+  }
+
+  .status-failed {
+    @apply bg-red-500/20 text-red-400;
+  }
+}
