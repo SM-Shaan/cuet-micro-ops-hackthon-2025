@@ -382,6 +382,11 @@ app.openapi(rootRoute, (c) => {
   return c.json({ message: "Hello Hono!" }, 200);
 });
 
+// Debug route to verify Sentry is working
+app.get("/debug-sentry", () => {
+  throw new Error("My first Sentry error!");
+});
+
 app.openapi(healthRoute, async (c) => {
   const storageHealthy = await checkS3Health();
   const status = storageHealthy ? "healthy" : "unhealthy";
