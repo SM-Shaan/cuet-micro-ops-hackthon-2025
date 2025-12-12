@@ -1,5 +1,5 @@
 // Initialize Sentry first - must be at the top
-import "./instrument.js";
+import "./instrument.ts";
 
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { serve } from "@hono/node-server";
