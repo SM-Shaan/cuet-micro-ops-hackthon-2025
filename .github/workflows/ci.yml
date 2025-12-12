@@ -2,13 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main, master, dev]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 permissions:
-  contents: read
-  actions: read
+  contents: write
+  actions: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -70,28 +70,101 @@ jobs:
           CORS_ORIGINS: "*"
           DOWNLOAD_DELAY_ENABLED: "false"
 
-  build:
-    name: Build Docker Image
+  build-and-deploy:
+    name: Build & Deploy
     runs-on: ubuntu-24.04
-    needs: test
+    needs: [test]
+    environment: production
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
+      # Login to DockerHub
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Setup Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      # Build and push all required images with commit SHA tag
+      - name: Build and push delineate-gateway image
         uses: docker/build-push-action@v6
         with:
+          push: true
+          context: .
+          file: docker/Dockerfile.gateway
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/delineate-gateway:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/delineate-gateway:latest
+
+      - name: Build and push delineate-app image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
           context: .
           file: docker/Dockerfile.prod
-          push: false
           tags: |
-            delineate-hackathon-challenge:${{ github.sha }}
-            delineate-hackathon-challenge:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/delineate-app:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/delineate-app:latest
+
+      - name: Build and push delineate-dashboard image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          context: ./frontend
+          file: frontend/Dockerfile
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/delineate-dashboard:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/delineate-dashboard:latest
+
+      # Update compose.prod.yml with new image SHAs using sed
+      - name: Update image tags in docker/compose.prod.yml
+        run: |
+          sed -i "s#asifmahmoud414/delineate-gateway:[^ ]*#${{ secrets.DOCKERHUB_USERNAME }}/delineate-gateway:${{ github.sha }}#g" docker/compose.prod.yml
+          sed -i "s#asifmahmoud414/delineate-app:[^ ]*#${{ secrets.DOCKERHUB_USERNAME }}/delineate-app:${{ github.sha }}#g" docker/compose.prod.yml
+          sed -i "s#asifmahmoud414/delineate-dashboard:[^ ]*#${{ secrets.DOCKERHUB_USERNAME }}/delineate-dashboard:${{ github.sha }}#g" docker/compose.prod.yml
+
+      # Commit and push the updated docker/compose.prod.yml to main with [skip ci], using bot account
+      - name: Commit and push updated compose.prod.yml
+        env:
+          ADMIN_MAIL: ${{ secrets.ADMIN_MAIL }}
+          ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git config --global user.email "$ADMIN_MAIL"
+          git config --global user.name "$ADMIN_NAME"
+          git checkout main
+          git pull origin main
+          git add docker/compose.prod.yml
+          git commit -m "ci: update production Docker image tags [skip ci]" || true
+          git push https://$GH_TOKEN@github.com/${{ github.repository }} main
+
+      # SSH into the production server and deploy
+      - name: Install SSH client
+        run: sudo apt-get update && sudo apt-get install -y openssh-client
+
+      - name: Prepare SSH key & known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.PROD_SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy on production server
+        env:
+          PROD_SERVER_IP: ${{ secrets.PROD_SERVER_IP }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+          PROD_SERVER_PATH: ${{ secrets.PROD_SERVER_PATH }}
+        run: |
+          ssh $PROD_SERVER_USER@$PROD_SERVER_IP "rm -rf $PROD_SERVER_PATH/delineate || true"
+          ssh $PROD_SERVER_USER@$PROD_SERVER_IP "git clone https://github.com/${{ github.repository }} $PROD_SERVER_PATH"
+          ssh $PROD_SERVER_USER@$PROD_SERVER_IP "cd $PROD_SERVER_PATH/delineate && git checkout main && git pull origin main && make prod-up"
 
   security:
     name: Security Scan

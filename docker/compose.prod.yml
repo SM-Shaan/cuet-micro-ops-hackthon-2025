@@ -3,8 +3,7 @@ name: delineate
 services:
   delineate-gateway:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.gateway
+      image: asifmahmoud414/delineate-gateway:v1.0.1
     ports:
       - "80:80"
     depends_on:
@@ -18,8 +17,7 @@ services:
 
   delineate-app:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.prod
+      image: asifmahmoud414/delineate-app:v1.0.1
     expose:
       - "3000"
     env_file:
@@ -47,7 +45,7 @@ services:
       - delineate-network
 
   rustfs:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.0-alpha.68
     expose:
       - "9000"
       - "9001"
@@ -78,8 +76,7 @@ services:
 
   delineate-dashboard:
     build:
-      context: ../frontend
-      dockerfile: Dockerfile
+      image: asifmahmoud414/delineate-dashboard:v1.0.1
     expose:
       - "80"
     env_file:
