@@ -1,5 +1,6 @@
 // Initialize Sentry first - must be at the top
-import "./instrument.ts";
+// eslint-disable-next-line import-x/order
+import { Sentry } from "./instrument.ts";
 
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { serve } from "@hono/node-server";
@@ -383,8 +384,13 @@ app.openapi(rootRoute, (c) => {
 });
 
 // Debug route to verify Sentry is working
-app.get("/debug-sentry", () => {
-  throw new Error("My first Sentry error!");
+app.get("/debug-sentry", (c) => {
+  try {
+    throw new Error("My first Sentry error!");
+  } catch (e) {
+    Sentry.captureException(e);
+    return c.json({ error: "Error captured and sent to Sentry!" }, 500);
+  }
 });
 
 app.openapi(healthRoute, async (c) => {
