@@ -384,12 +384,33 @@ app.openapi(rootRoute, (c) => {
 });
 
 // Debug route to verify Sentry is working
-app.get("/debug-sentry", (c) => {
+const debugSentryRoute = createRoute({
+  method: "get",
+  path: "/debug-sentry",
+  tags: ["Debug"],
+  summary: "Test Sentry integration",
+  description: "Triggers an intentional error to verify Sentry is working",
+  responses: {
+    500: {
+      description: "Error captured by Sentry",
+      content: {
+        "application/json": {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+  },
+});
+
+app.openapi(debugSentryRoute, (c) => {
   try {
     throw new Error("My first Sentry error!");
   } catch (e) {
     Sentry.captureException(e);
-    return c.json({ error: "Error captured and sent to Sentry!" }, 500);
+    return c.json(
+      { error: "Sentry Test", message: "Error captured and sent to Sentry!" },
+      500,
+    );
   }
 });
 
