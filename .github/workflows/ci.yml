@@ -70,7 +70,7 @@ jobs:
           CORS_ORIGINS: "*"
           DOWNLOAD_DELAY_ENABLED: "false"
 
-  build-and-deploy:
+  build-and-push:
     name: Build & Deploy
     runs-on: ubuntu-24.04
     needs: [test]
