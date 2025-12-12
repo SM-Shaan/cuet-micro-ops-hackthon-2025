@@ -1,12 +1,27 @@
 name: delineate
 
 services:
+  delineate-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    ports:
+      - "80:80"
+    depends_on:
+      delineate-app:
+        condition: service_healthy
+      delineate-dashboard:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - delineate-network
+
   delineate-app:
     build:
       context: ..
       dockerfile: docker/Dockerfile.prod
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     env_file:
       - ../.env
     environment:
@@ -28,12 +43,14 @@ services:
       rustfs-init:
         condition: service_completed_successfully
     restart: unless-stopped
+    networks:
+      - delineate-network
 
   rustfs:
     image: rustfs/rustfs:latest
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    expose:
+      - "9000"
+      - "9001"
     environment:
       - RUSTFS_ACCESS_KEY=rustfsadmin
       - RUSTFS_SECRET_KEY=rustfsadmin
@@ -41,6 +58,8 @@ services:
       - rustfs-data:/data
       - rustfs-logs:/logs
     restart: unless-stopped
+    networks:
+      - delineate-network
 
   rustfs-init:
     image: minio/mc:latest
@@ -54,6 +73,28 @@ services:
       mc mb myrustfs/downloads --ignore-existing;
       exit 0;
       "
+    networks:
+      - delineate-network
+
+  delineate-dashboard:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    env_file:
+      - ../.env
+    environment:
+      - VITE_SENTRY_DSN=${SENTRY_DSN:-}
+      - VITE_OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - VITE_JAEGER_UI_URL=${JAEGER_UI_URL:-}
+    restart: unless-stopped
+    networks:
+      - delineate-network
+
+networks:
+  delineate-network:
+    driver: bridge
 
 volumes:
   rustfs-data:

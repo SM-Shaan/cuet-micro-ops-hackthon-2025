@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Sentry } from "../lib/sentry";
+import { generateUUID } from "../lib/uuid";
 
 interface ErrorEntry {
   id: string;
@@ -29,7 +30,7 @@ export function ErrorLog({ limit }: ErrorLogProps) {
     console.error = (...args) => {
       const message = args.map(String).join(" ");
       const errorEntry: ErrorEntry = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         message,
         timestamp: new Date(),
         traceId: sessionStorage.getItem("currentTraceId") || undefined,
@@ -91,7 +92,7 @@ export function ErrorLog({ limit }: ErrorLogProps) {
       Sentry.captureException(error);
 
       const errorEntry: ErrorEntry = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         message: error.message,
         timestamp: new Date(),
         traceId: sessionStorage.getItem("currentTraceId") || undefined,

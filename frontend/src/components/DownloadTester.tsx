@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createSpan, getCurrentTraceId } from "../lib/tracing";
 import { addBreadcrumb, captureError } from "../lib/sentry";
+import { generateUUID } from "../lib/uuid";
 
 interface DownloadJob {
   id: string;
@@ -35,7 +36,7 @@ export function DownloadTester() {
     const startTime = Date.now();
 
     const job: DownloadJob = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       fileId,
       status: "processing",
       progress: 0,
