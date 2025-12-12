@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+  actions: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -94,6 +98,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: lint
     permissions:
+      contents: read
       security-events: write
     steps:
       - name: Checkout
