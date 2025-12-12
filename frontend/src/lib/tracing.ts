@@ -1,13 +1,13 @@
-import { context, trace, SpanStatusCode } from '@opentelemetry/api';
-import { ZoneContextManager } from '@opentelemetry/context-zone';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { FetchInstrumentation } from '@opentelemetry/instrumentation-fetch';
-import { Resource } from '@opentelemetry/resources';
+import { context, trace, SpanStatusCode } from "@opentelemetry/api";
+import { ZoneContextManager } from "@opentelemetry/context-zone";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
+import { Resource } from "@opentelemetry/resources";
 import {
   BatchSpanProcessor,
   WebTracerProvider,
-} from '@opentelemetry/sdk-trace-web';
-import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
+} from "@opentelemetry/sdk-trace-web";
+import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
 let tracerProvider: WebTracerProvider | null = null;
 
@@ -15,12 +15,12 @@ export function initTracing() {
   const endpoint = import.meta.env.VITE_OTEL_EXPORTER_OTLP_ENDPOINT;
 
   if (!endpoint) {
-    console.warn('OTEL endpoint not configured. Tracing disabled.');
+    console.warn("OTEL endpoint not configured. Tracing disabled.");
     return;
   }
 
   const resource = new Resource({
-    [ATTR_SERVICE_NAME]: 'delineate-dashboard',
+    [ATTR_SERVICE_NAME]: "delineate-dashboard",
   });
 
   tracerProvider = new WebTracerProvider({ resource });
@@ -44,11 +44,11 @@ export function initTracing() {
   fetchInstrumentation.setTracerProvider(tracerProvider);
   fetchInstrumentation.enable();
 
-  console.log('OpenTelemetry tracing initialized');
+  console.log("OpenTelemetry tracing initialized");
 }
 
 export function getTracer() {
-  return trace.getTracer('delineate-dashboard');
+  return trace.getTracer("delineate-dashboard");
 }
 
 export function getCurrentTraceId(): string | null {
@@ -63,7 +63,7 @@ export function getCurrentTraceId(): string | null {
 export function createSpan<T>(
   name: string,
   fn: () => Promise<T>,
-  attributes?: Record<string, string | number | boolean>
+  attributes?: Record<string, string | number | boolean>,
 ): Promise<T> {
   const tracer = getTracer();
   return tracer.startActiveSpan(name, async (span) => {
@@ -75,7 +75,7 @@ export function createSpan<T>(
       }
 
       // Store trace ID for Sentry correlation
-      sessionStorage.setItem('currentTraceId', span.spanContext().traceId);
+      sessionStorage.setItem("currentTraceId", span.spanContext().traceId);
 
       const result = await fn();
       span.setStatus({ code: SpanStatusCode.OK });
@@ -83,9 +83,11 @@ export function createSpan<T>(
     } catch (error) {
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : 'Unknown error',
+        message: error instanceof Error ? error.message : "Unknown error",
       });
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
+      span.recordException(
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     } finally {
       span.end();
@@ -95,7 +97,7 @@ export function createSpan<T>(
 
 export function withTracing<T extends (...args: unknown[]) => Promise<unknown>>(
   name: string,
-  fn: T
+  fn: T,
 ): T {
   return (async (...args: Parameters<T>) => {
     return createSpan(name, () => fn(...args));

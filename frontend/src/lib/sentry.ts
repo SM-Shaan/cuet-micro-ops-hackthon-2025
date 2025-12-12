@@ -1,10 +1,10 @@
-import * as Sentry from '@sentry/react';
+import * as Sentry from "@sentry/react";
 
 export function initSentry() {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
 
   if (!dsn) {
-    console.warn('Sentry DSN not configured. Error tracking disabled.');
+    console.warn("Sentry DSN not configured. Error tracking disabled.");
     return;
   }
 
@@ -23,7 +23,7 @@ export function initSentry() {
     replaysOnErrorSampleRate: 1.0,
     beforeSend(event) {
       // Add trace ID to Sentry events for correlation
-      const traceId = sessionStorage.getItem('currentTraceId');
+      const traceId = sessionStorage.getItem("currentTraceId");
       if (traceId) {
         event.tags = { ...event.tags, trace_id: traceId };
       }
@@ -45,13 +45,13 @@ export function setUser(userId: string) {
 export function addBreadcrumb(
   message: string,
   category: string,
-  data?: Record<string, unknown>
+  data?: Record<string, unknown>,
 ) {
   Sentry.addBreadcrumb({
     message,
     category,
     data,
-    level: 'info',
+    level: "info",
   });
 }
 

@@ -28,13 +28,13 @@ The download microservice handles file operations with variable processing times
 
 ### Critical Issues Behind Reverse Proxies
 
-| Problem | Impact |
-|---------|--------|
+| Problem             | Impact                                                                   |
+| ------------------- | ------------------------------------------------------------------------ |
 | Connection Timeouts | Cloudflare (100s), nginx (60s default), AWS ALB (60s) terminate requests |
-| Gateway Errors | Users see 504/502 errors for slow downloads |
-| Poor UX | No feedback during 2+ minute waits |
-| Resource Exhaustion | Open HTTP connections consume server memory |
-| Retry Storms | Dropped connections trigger duplicate processing |
+| Gateway Errors      | Users see 504/502 errors for slow downloads                              |
+| Poor UX             | No feedback during 2+ minute waits                                       |
+| Resource Exhaustion | Open HTTP connections consume server memory                              |
+| Retry Storms        | Dropped connections trigger duplicate processing                         |
 
 ---
 
@@ -186,13 +186,13 @@ I recommend a **Hybrid approach** combining polling with optional Server-Sent Ev
 
 #### Why Hybrid?
 
-| Feature | Benefit |
-|---------|---------|
-| **Polling as Primary** | Works through all proxies, simple implementation |
-| **SSE as Enhancement** | Real-time updates when supported |
-| **Graceful Degradation** | Falls back to polling if SSE unavailable |
-| **Proxy Compatible** | Short-lived requests avoid timeout issues |
-| **Resource Efficient** | SSE reduces polling frequency |
+| Feature                  | Benefit                                          |
+| ------------------------ | ------------------------------------------------ |
+| **Polling as Primary**   | Works through all proxies, simple implementation |
+| **SSE as Enhancement**   | Real-time updates when supported                 |
+| **Graceful Degradation** | Falls back to polling if SSE unavailable         |
+| **Proxy Compatible**     | Short-lived requests avoid timeout issues        |
+| **Resource Efficient**   | SSE reduces polling frequency                    |
 
 ### Pattern Comparison
 
@@ -222,16 +222,16 @@ I recommend a **Hybrid approach** combining polling with optional Server-Sent Ev
 // Now returns immediately with jobId, processes asynchronously
 
 interface InitiateRequest {
-  file_ids: number[];  // Array of file IDs (10K to 100M)
+  file_ids: number[]; // Array of file IDs (10K to 100M)
 }
 
 interface InitiateResponse {
-  jobId: string;           // UUID for tracking
-  status: 'queued';        // Always queued initially
-  totalFiles: number;      // Count of files requested
+  jobId: string; // UUID for tracking
+  status: "queued"; // Always queued initially
+  totalFiles: number; // Count of files requested
   estimatedTimeMs: number; // Estimated processing time
-  statusUrl: string;       // URL to check status
-  createdAt: string;       // ISO timestamp
+  statusUrl: string; // URL to check status
+  createdAt: string; // ISO timestamp
 }
 ```
 
@@ -243,15 +243,15 @@ interface InitiateResponse {
 
 interface StatusResponse {
   jobId: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed' | 'expired';
-  progress: number;           // 0-100 percentage
-  currentFile?: number;       // Currently processing file ID
-  processedFiles: number;     // Count of completed files
-  totalFiles: number;         // Total files in job
-  startedAt?: string;         // When processing began
-  completedAt?: string;       // When job finished
-  downloadUrl?: string;       // Available when completed
-  expiresAt?: string;         // When download URL expires
+  status: "queued" | "processing" | "completed" | "failed" | "expired";
+  progress: number; // 0-100 percentage
+  currentFile?: number; // Currently processing file ID
+  processedFiles: number; // Count of completed files
+  totalFiles: number; // Total files in job
+  startedAt?: string; // When processing began
+  completedAt?: string; // When job finished
+  downloadUrl?: string; // Available when completed
+  expiresAt?: string; // When download URL expires
   error?: {
     code: string;
     message: string;
@@ -272,10 +272,10 @@ interface StatusResponse {
 
 interface DownloadResponse {
   jobId: string;
-  downloadUrl: string;       // Presigned S3 URL
-  expiresAt: string;         // URL expiration time
-  fileSize: number;          // Total size in bytes
-  checksum?: string;         // Optional MD5/SHA256
+  downloadUrl: string; // Presigned S3 URL
+  expiresAt: string; // URL expiration time
+  fileSize: number; // Total size in bytes
+  checksum?: string; // Optional MD5/SHA256
 }
 
 // DELETE /v1/download/:jobId - NEW
@@ -283,7 +283,7 @@ interface DownloadResponse {
 
 interface CancelResponse {
   jobId: string;
-  status: 'cancelled';
+  status: "cancelled";
   message: string;
 }
 ```
@@ -299,20 +299,20 @@ interface CancelResponse {
 
 interface JobHash {
   id: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
-  fileIds: string;          // JSON array of file IDs
+  status: "queued" | "processing" | "completed" | "failed" | "cancelled";
+  fileIds: string; // JSON array of file IDs
   totalFiles: number;
   processedFiles: number;
-  progress: number;         // 0-100
+  progress: number; // 0-100
   currentFile: number | null;
-  createdAt: number;        // Unix timestamp
+  createdAt: number; // Unix timestamp
   startedAt: number | null;
   completedAt: number | null;
   downloadUrl: string | null;
   downloadExpiresAt: number | null;
   errorCode: string | null;
   errorMessage: string | null;
-  userId: string | null;    // Optional user tracking
+  userId: string | null; // Optional user tracking
   retryCount: number;
 }
 
@@ -354,37 +354,37 @@ ZREM jobs:active "abc123"
 #### Queue Configuration (BullMQ)
 
 ```typescript
-import { Queue, Worker, Job } from 'bullmq';
-import { Redis } from 'ioredis';
+import { Queue, Worker, Job } from "bullmq";
+import { Redis } from "ioredis";
 
 const redis = new Redis({
   host: process.env.REDIS_HOST,
-  port: parseInt(process.env.REDIS_PORT || '6379'),
+  port: parseInt(process.env.REDIS_PORT || "6379"),
   maxRetriesPerRequest: null, // Required for BullMQ
 });
 
 // Queue definition
-const downloadQueue = new Queue('downloads', {
+const downloadQueue = new Queue("downloads", {
   connection: redis,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
-      type: 'exponential',
+      type: "exponential",
       delay: 5000,
     },
     removeOnComplete: {
-      age: 86400,      // Keep completed jobs for 24h
-      count: 1000,     // Keep last 1000 jobs
+      age: 86400, // Keep completed jobs for 24h
+      count: 1000, // Keep last 1000 jobs
     },
     removeOnFail: {
-      age: 604800,     // Keep failed jobs for 7 days
+      age: 604800, // Keep failed jobs for 7 days
     },
   },
 });
 
 // Worker definition
 const worker = new Worker(
-  'downloads',
+  "downloads",
   async (job: Job) => {
     const { jobId, fileIds } = job.data;
 
@@ -400,7 +400,7 @@ const worker = new Worker(
 
       // Check for cancellation
       if (await isJobCancelled(jobId)) {
-        throw new Error('Job cancelled by user');
+        throw new Error("Job cancelled by user");
       }
     }
 
@@ -412,20 +412,20 @@ const worker = new Worker(
   },
   {
     connection: redis,
-    concurrency: 5,           // Process 5 jobs simultaneously
+    concurrency: 5, // Process 5 jobs simultaneously
     limiter: {
-      max: 10,                // Max 10 jobs per minute
+      max: 10, // Max 10 jobs per minute
       duration: 60000,
     },
-  }
+  },
 );
 
 // Event handlers
-worker.on('completed', (job) => {
+worker.on("completed", (job) => {
   console.log(`Job ${job.id} completed`);
 });
 
-worker.on('failed', (job, err) => {
+worker.on("failed", (job, err) => {
   console.error(`Job ${job?.id} failed:`, err.message);
 });
 ```
@@ -469,7 +469,7 @@ page_rules:
 
 # Transform Rules (for headers)
 transform_rules:
-  - expression: "(http.request.uri.path contains \"/v1/download/\")"
+  - expression: '(http.request.uri.path contains "/v1/download/")'
     action:
       set_headers:
         - name: "CF-Connecting-IP"
@@ -487,7 +487,7 @@ firewall_rules:
 
 ```javascript
 // Cloudflare Worker (optional edge caching)
-addEventListener('fetch', event => {
+addEventListener("fetch", (event) => {
   event.respondWith(handleRequest(event.request));
 });
 
@@ -495,7 +495,7 @@ async function handleRequest(request) {
   const url = new URL(request.url);
 
   // Handle SSE endpoints specially
-  if (url.pathname.includes('/events/')) {
+  if (url.pathname.includes("/events/")) {
     return fetch(request, {
       cf: {
         // Disable buffering for SSE
@@ -506,10 +506,10 @@ async function handleRequest(request) {
   }
 
   // Status endpoints - short cache
-  if (url.pathname.includes('/status/')) {
+  if (url.pathname.includes("/status/")) {
     const response = await fetch(request);
     const newResponse = new Response(response.body, response);
-    newResponse.headers.set('Cache-Control', 'no-store, max-age=0');
+    newResponse.headers.set("Cache-Control", "no-store, max-age=0");
     return newResponse;
   }
 
@@ -700,19 +700,19 @@ resource "aws_lb_listener_rule" "sse_events" {
 
 ```typescript
 // hooks/useDownload.ts
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface DownloadStatus {
   jobId: string;
-  status: 'idle' | 'queued' | 'processing' | 'completed' | 'failed';
+  status: "idle" | "queued" | "processing" | "completed" | "failed";
   progress: number;
   downloadUrl?: string;
   error?: string;
 }
 
 interface UseDownloadOptions {
-  pollInterval?: number;     // Default: 3000ms
-  enableSSE?: boolean;       // Default: true
+  pollInterval?: number; // Default: 3000ms
+  enableSSE?: boolean; // Default: true
   onComplete?: (url: string) => void;
   onError?: (error: string) => void;
 }
@@ -726,8 +726,8 @@ export function useDownload(options: UseDownloadOptions = {}) {
   } = options;
 
   const [status, setStatus] = useState<DownloadStatus>({
-    jobId: '',
-    status: 'idle',
+    jobId: "",
+    status: "idle",
     progress: 0,
   });
 
@@ -747,141 +747,153 @@ export function useDownload(options: UseDownloadOptions = {}) {
   }, []);
 
   // Poll status endpoint
-  const pollStatus = useCallback(async (jobId: string) => {
-    try {
-      const response = await fetch(`/api/v1/download/status/${jobId}`);
-      const data = await response.json();
+  const pollStatus = useCallback(
+    async (jobId: string) => {
+      try {
+        const response = await fetch(`/api/v1/download/status/${jobId}`);
+        const data = await response.json();
 
-      setStatus(prev => ({
-        ...prev,
-        status: data.status,
-        progress: data.progress,
-        downloadUrl: data.downloadUrl,
-        error: data.error?.message,
-      }));
+        setStatus((prev) => ({
+          ...prev,
+          status: data.status,
+          progress: data.progress,
+          downloadUrl: data.downloadUrl,
+          error: data.error?.message,
+        }));
 
-      if (data.status === 'completed') {
-        cleanup();
-        onComplete?.(data.downloadUrl);
-      } else if (data.status === 'failed') {
-        cleanup();
-        onError?.(data.error?.message || 'Download failed');
-      }
-    } catch (err) {
-      console.error('Failed to poll status:', err);
-    }
-  }, [cleanup, onComplete, onError]);
-
-  // Setup SSE connection
-  const setupSSE = useCallback((jobId: string) => {
-    if (!enableSSE) return false;
-
-    try {
-      const eventSource = new EventSource(`/api/v1/download/events/${jobId}`);
-      eventSourceRef.current = eventSource;
-
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-
-        if (data.type === 'progress') {
-          setStatus(prev => ({
-            ...prev,
-            status: 'processing',
-            progress: data.progress,
-          }));
-        } else if (data.type === 'completed') {
-          setStatus(prev => ({
-            ...prev,
-            status: 'completed',
-            progress: 100,
-            downloadUrl: data.downloadUrl,
-          }));
+        if (data.status === "completed") {
           cleanup();
           onComplete?.(data.downloadUrl);
-        } else if (data.type === 'failed') {
-          setStatus(prev => ({
-            ...prev,
-            status: 'failed',
-            error: data.error.message,
-          }));
+        } else if (data.status === "failed") {
           cleanup();
-          onError?.(data.error.message);
+          onError?.(data.error?.message || "Download failed");
         }
-      };
+      } catch (err) {
+        console.error("Failed to poll status:", err);
+      }
+    },
+    [cleanup, onComplete, onError],
+  );
 
-      eventSource.onerror = () => {
-        // SSE failed, fall back to polling
-        eventSource.close();
-        eventSourceRef.current = null;
-        startPolling(jobId);
-      };
+  // Setup SSE connection
+  const setupSSE = useCallback(
+    (jobId: string) => {
+      if (!enableSSE) return false;
 
-      return true;
-    } catch {
-      return false;
-    }
-  }, [enableSSE, cleanup, onComplete, onError]);
+      try {
+        const eventSource = new EventSource(`/api/v1/download/events/${jobId}`);
+        eventSourceRef.current = eventSource;
+
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+
+          if (data.type === "progress") {
+            setStatus((prev) => ({
+              ...prev,
+              status: "processing",
+              progress: data.progress,
+            }));
+          } else if (data.type === "completed") {
+            setStatus((prev) => ({
+              ...prev,
+              status: "completed",
+              progress: 100,
+              downloadUrl: data.downloadUrl,
+            }));
+            cleanup();
+            onComplete?.(data.downloadUrl);
+          } else if (data.type === "failed") {
+            setStatus((prev) => ({
+              ...prev,
+              status: "failed",
+              error: data.error.message,
+            }));
+            cleanup();
+            onError?.(data.error.message);
+          }
+        };
+
+        eventSource.onerror = () => {
+          // SSE failed, fall back to polling
+          eventSource.close();
+          eventSourceRef.current = null;
+          startPolling(jobId);
+        };
+
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [enableSSE, cleanup, onComplete, onError],
+  );
 
   // Start polling fallback
-  const startPolling = useCallback((jobId: string) => {
-    if (pollIntervalRef.current) return;
+  const startPolling = useCallback(
+    (jobId: string) => {
+      if (pollIntervalRef.current) return;
 
-    // Immediate first poll
-    pollStatus(jobId);
-
-    // Setup interval
-    pollIntervalRef.current = setInterval(() => {
+      // Immediate first poll
       pollStatus(jobId);
-    }, pollInterval);
-  }, [pollStatus, pollInterval]);
+
+      // Setup interval
+      pollIntervalRef.current = setInterval(() => {
+        pollStatus(jobId);
+      }, pollInterval);
+    },
+    [pollStatus, pollInterval],
+  );
 
   // Initiate download
-  const initiateDownload = useCallback(async (fileIds: number[]) => {
-    cleanup();
+  const initiateDownload = useCallback(
+    async (fileIds: number[]) => {
+      cleanup();
 
-    setStatus({
-      jobId: '',
-      status: 'queued',
-      progress: 0,
-    });
-
-    try {
-      const response = await fetch('/api/v1/download/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_ids: fileIds }),
+      setStatus({
+        jobId: "",
+        status: "queued",
+        progress: 0,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to initiate download');
+      try {
+        const response = await fetch("/api/v1/download/initiate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file_ids: fileIds }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to initiate download");
+        }
+
+        const data = await response.json();
+
+        setStatus((prev) => ({
+          ...prev,
+          jobId: data.jobId,
+          status: "queued",
+        }));
+
+        // Try SSE first, fall back to polling
+        const sseConnected = setupSSE(data.jobId);
+        if (!sseConnected) {
+          startPolling(data.jobId);
+        }
+
+        return data.jobId;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        setStatus((prev) => ({
+          ...prev,
+          status: "failed",
+          error: message,
+        }));
+        onError?.(message);
+        throw err;
       }
-
-      const data = await response.json();
-
-      setStatus(prev => ({
-        ...prev,
-        jobId: data.jobId,
-        status: 'queued',
-      }));
-
-      // Try SSE first, fall back to polling
-      const sseConnected = setupSSE(data.jobId);
-      if (!sseConnected) {
-        startPolling(data.jobId);
-      }
-
-      return data.jobId;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setStatus(prev => ({
-        ...prev,
-        status: 'failed',
-        error: message,
-      }));
-      onError?.(message);
-      throw err;
-    }
-  }, [cleanup, setupSSE, startPolling, onError]);
+    },
+    [cleanup, setupSSE, startPolling, onError],
+  );
 
   // Cancel download
   const cancelDownload = useCallback(async () => {
@@ -891,15 +903,15 @@ export function useDownload(options: UseDownloadOptions = {}) {
 
     try {
       await fetch(`/api/v1/download/${status.jobId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
     } catch (err) {
-      console.error('Failed to cancel download:', err);
+      console.error("Failed to cancel download:", err);
     }
 
     setStatus({
-      jobId: '',
-      status: 'idle',
+      jobId: "",
+      status: "idle",
       progress: 0,
     });
   }, [status.jobId, cleanup]);
@@ -913,7 +925,7 @@ export function useDownload(options: UseDownloadOptions = {}) {
     status,
     initiateDownload,
     cancelDownload,
-    isLoading: status.status === 'queued' || status.status === 'processing',
+    isLoading: status.status === "queued" || status.status === "processing",
   };
 }
 ```
@@ -922,8 +934,8 @@ export function useDownload(options: UseDownloadOptions = {}) {
 
 ```tsx
 // components/DownloadButton.tsx
-import React from 'react';
-import { useDownload } from '../hooks/useDownload';
+import React from "react";
+import { useDownload } from "../hooks/useDownload";
 
 interface DownloadButtonProps {
   fileIds: number[];
@@ -934,10 +946,10 @@ export function DownloadButton({ fileIds, className }: DownloadButtonProps) {
   const { status, initiateDownload, cancelDownload, isLoading } = useDownload({
     onComplete: (url) => {
       // Auto-download when ready
-      window.open(url, '_blank');
+      window.open(url, "_blank");
     },
     onError: (error) => {
-      console.error('Download failed:', error);
+      console.error("Download failed:", error);
     },
   });
 
@@ -953,20 +965,22 @@ export function DownloadButton({ fileIds, className }: DownloadButtonProps) {
     <div className={className}>
       <button
         onClick={handleClick}
-        disabled={status.status === 'completed'}
+        disabled={status.status === "completed"}
         className={`
           px-4 py-2 rounded-lg font-medium transition-all
-          ${isLoading
-            ? 'bg-red-500 hover:bg-red-600 text-white'
-            : 'bg-blue-500 hover:bg-blue-600 text-white'}
+          ${
+            isLoading
+              ? "bg-red-500 hover:bg-red-600 text-white"
+              : "bg-blue-500 hover:bg-blue-600 text-white"
+          }
           disabled:bg-gray-300 disabled:cursor-not-allowed
         `}
       >
-        {status.status === 'idle' && 'Download Files'}
-        {status.status === 'queued' && 'Queued...'}
-        {status.status === 'processing' && `Cancel (${status.progress}%)`}
-        {status.status === 'completed' && 'Downloaded'}
-        {status.status === 'failed' && 'Retry Download'}
+        {status.status === "idle" && "Download Files"}
+        {status.status === "queued" && "Queued..."}
+        {status.status === "processing" && `Cancel (${status.progress}%)`}
+        {status.status === "completed" && "Downloaded"}
+        {status.status === "failed" && "Retry Download"}
       </button>
 
       {/* Progress bar */}
@@ -992,8 +1006,8 @@ export function DownloadButton({ fileIds, className }: DownloadButtonProps) {
 
 ```tsx
 // components/DownloadManager.tsx
-import React, { useState } from 'react';
-import { useDownload } from '../hooks/useDownload';
+import React, { useState } from "react";
+import { useDownload } from "../hooks/useDownload";
 
 interface DownloadJob {
   id: string;
@@ -1008,36 +1022,41 @@ export function DownloadManager() {
   const addDownload = async (fileIds: number[]) => {
     const tempId = crypto.randomUUID();
 
-    setJobs(prev => [...prev, {
-      id: tempId,
-      fileIds,
-      status: 'initiating',
-      progress: 0,
-    }]);
+    setJobs((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        fileIds,
+        status: "initiating",
+        progress: 0,
+      },
+    ]);
 
     try {
-      const response = await fetch('/api/v1/download/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/v1/download/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_ids: fileIds }),
       });
 
       const data = await response.json();
 
-      setJobs(prev => prev.map(job =>
-        job.id === tempId
-          ? { ...job, id: data.jobId, status: 'queued' }
-          : job
-      ));
+      setJobs((prev) =>
+        prev.map((job) =>
+          job.id === tempId
+            ? { ...job, id: data.jobId, status: "queued" }
+            : job,
+        ),
+      );
 
       // Start tracking this job
       trackJob(data.jobId);
     } catch (err) {
-      setJobs(prev => prev.map(job =>
-        job.id === tempId
-          ? { ...job, status: 'failed' }
-          : job
-      ));
+      setJobs((prev) =>
+        prev.map((job) =>
+          job.id === tempId ? { ...job, status: "failed" } : job,
+        ),
+      );
     }
   };
 
@@ -1047,17 +1066,19 @@ export function DownloadManager() {
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
-      setJobs(prev => prev.map(job =>
-        job.id === jobId
-          ? {
-              ...job,
-              status: data.type === 'progress' ? 'processing' : data.type,
-              progress: data.progress || job.progress,
-            }
-          : job
-      ));
+      setJobs((prev) =>
+        prev.map((job) =>
+          job.id === jobId
+            ? {
+                ...job,
+                status: data.type === "progress" ? "processing" : data.type,
+                progress: data.progress || job.progress,
+              }
+            : job,
+        ),
+      );
 
-      if (data.type === 'completed' || data.type === 'failed') {
+      if (data.type === "completed" || data.type === "failed") {
         eventSource.close();
       }
     };
@@ -1075,21 +1096,23 @@ export function DownloadManager() {
       </button>
 
       <div className="space-y-2">
-        {jobs.map(job => (
+        {jobs.map((job) => (
           <div key={job.id} className="border p-3 rounded">
             <div className="flex justify-between">
               <span className="font-mono text-sm">{job.id.slice(0, 8)}...</span>
-              <span className={`
+              <span
+                className={`
                 px-2 py-1 rounded text-xs
-                ${job.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
-                ${job.status === 'processing' ? 'bg-blue-100 text-blue-800' : ''}
-                ${job.status === 'failed' ? 'bg-red-100 text-red-800' : ''}
-                ${job.status === 'queued' ? 'bg-yellow-100 text-yellow-800' : ''}
-              `}>
+                ${job.status === "completed" ? "bg-green-100 text-green-800" : ""}
+                ${job.status === "processing" ? "bg-blue-100 text-blue-800" : ""}
+                ${job.status === "failed" ? "bg-red-100 text-red-800" : ""}
+                ${job.status === "queued" ? "bg-yellow-100 text-yellow-800" : ""}
+              `}
+              >
                 {job.status}
               </span>
             </div>
-            {job.status === 'processing' && (
+            {job.status === "processing" && (
               <div className="mt-2 bg-gray-200 rounded-full h-2">
                 <div
                   className="bg-blue-500 h-2 rounded-full"
@@ -1118,7 +1141,7 @@ interface RetryOptions {
 
 export async function withRetry<T>(
   fn: () => Promise<T>,
-  options: RetryOptions = {}
+  options: RetryOptions = {},
 ): Promise<T> {
   const {
     maxRetries = 3,
@@ -1142,10 +1165,10 @@ export async function withRetry<T>(
       // Exponential backoff with jitter
       const delay = Math.min(
         baseDelay * Math.pow(2, attempt) + Math.random() * 1000,
-        maxDelay
+        maxDelay,
       );
 
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
@@ -1155,17 +1178,18 @@ export async function withRetry<T>(
 // Usage in download hook
 const fetchWithRetry = (url: string, options?: RequestInit) =>
   withRetry(
-    () => fetch(url, options).then(res => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    }),
+    () =>
+      fetch(url, options).then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      }),
     {
       maxRetries: 3,
       shouldRetry: (error) => {
         // Don't retry client errors (4xx)
-        return !error.message.includes('HTTP 4');
+        return !error.message.includes("HTTP 4");
       },
-    }
+    },
   );
 ```
 
@@ -1175,25 +1199,25 @@ const fetchWithRetry = (url: string, options?: RequestInit) =>
 
 ### Error Codes
 
-| Code | HTTP Status | Description | Client Action |
-|------|-------------|-------------|---------------|
-| `JOB_NOT_FOUND` | 404 | Job ID doesn't exist | Show error, allow new download |
-| `JOB_EXPIRED` | 410 | Job data has expired | Initiate new download |
-| `JOB_CANCELLED` | 409 | Job was cancelled | Allow restart |
-| `RATE_LIMITED` | 429 | Too many requests | Retry after delay |
-| `STORAGE_ERROR` | 503 | S3/storage unavailable | Retry with backoff |
-| `PROCESSING_ERROR` | 500 | Internal processing failure | Retry 3x, then fail |
-| `INVALID_FILE_ID` | 400 | File ID out of range | Show validation error |
-| `QUOTA_EXCEEDED` | 403 | User quota exceeded | Show upgrade message |
+| Code               | HTTP Status | Description                 | Client Action                  |
+| ------------------ | ----------- | --------------------------- | ------------------------------ |
+| `JOB_NOT_FOUND`    | 404         | Job ID doesn't exist        | Show error, allow new download |
+| `JOB_EXPIRED`      | 410         | Job data has expired        | Initiate new download          |
+| `JOB_CANCELLED`    | 409         | Job was cancelled           | Allow restart                  |
+| `RATE_LIMITED`     | 429         | Too many requests           | Retry after delay              |
+| `STORAGE_ERROR`    | 503         | S3/storage unavailable      | Retry with backoff             |
+| `PROCESSING_ERROR` | 500         | Internal processing failure | Retry 3x, then fail            |
+| `INVALID_FILE_ID`  | 400         | File ID out of range        | Show validation error          |
+| `QUOTA_EXCEEDED`   | 403         | User quota exceeded         | Show upgrade message           |
 
 ### Circuit Breaker Pattern
 
 ```typescript
 // utils/circuitBreaker.ts
-type CircuitState = 'closed' | 'open' | 'half-open';
+type CircuitState = "closed" | "open" | "half-open";
 
 class CircuitBreaker {
-  private state: CircuitState = 'closed';
+  private state: CircuitState = "closed";
   private failures = 0;
   private lastFailure: number = 0;
   private successCount = 0;
@@ -1201,16 +1225,16 @@ class CircuitBreaker {
   constructor(
     private readonly threshold: number = 5,
     private readonly timeout: number = 30000,
-    private readonly halfOpenRequests: number = 3
+    private readonly halfOpenRequests: number = 3,
   ) {}
 
   async execute<T>(fn: () => Promise<T>): Promise<T> {
-    if (this.state === 'open') {
+    if (this.state === "open") {
       if (Date.now() - this.lastFailure > this.timeout) {
-        this.state = 'half-open';
+        this.state = "half-open";
         this.successCount = 0;
       } else {
-        throw new Error('Circuit breaker is open');
+        throw new Error("Circuit breaker is open");
       }
     }
 
@@ -1225,10 +1249,10 @@ class CircuitBreaker {
   }
 
   private onSuccess() {
-    if (this.state === 'half-open') {
+    if (this.state === "half-open") {
       this.successCount++;
       if (this.successCount >= this.halfOpenRequests) {
-        this.state = 'closed';
+        this.state = "closed";
         this.failures = 0;
       }
     } else {
@@ -1241,7 +1265,7 @@ class CircuitBreaker {
     this.lastFailure = Date.now();
 
     if (this.failures >= this.threshold) {
-      this.state = 'open';
+      this.state = "open";
     }
   }
 }
@@ -1262,16 +1286,16 @@ interface OfflineJob {
 
 const queueOfflineDownload = (fileIds: number[]) => {
   const jobs: OfflineJob[] = JSON.parse(
-    localStorage.getItem('offlineDownloads') || '[]'
+    localStorage.getItem("offlineDownloads") || "[]",
   );
 
   jobs.push({ fileIds, createdAt: Date.now() });
-  localStorage.setItem('offlineDownloads', JSON.stringify(jobs));
+  localStorage.setItem("offlineDownloads", JSON.stringify(jobs));
 };
 
 const processOfflineQueue = async () => {
   const jobs: OfflineJob[] = JSON.parse(
-    localStorage.getItem('offlineDownloads') || '[]'
+    localStorage.getItem("offlineDownloads") || "[]",
   );
 
   for (const job of jobs) {
@@ -1284,11 +1308,11 @@ const processOfflineQueue = async () => {
   }
 
   // Clear processed jobs
-  localStorage.removeItem('offlineDownloads');
+  localStorage.removeItem("offlineDownloads");
 };
 
 // Check online status and process queue
-window.addEventListener('online', processOfflineQueue);
+window.addEventListener("online", processOfflineQueue);
 ```
 
 ---
@@ -1305,6 +1329,7 @@ This architecture addresses the core problem of long-running downloads by:
 6. **User-Friendly**: Progress indicators and clear error messages
 
 The hybrid polling + SSE approach provides the best balance of:
+
 - **Reliability**: Works through all proxy configurations
 - **Responsiveness**: Real-time updates when SSE is available
 - **Simplicity**: Easy to implement and debug

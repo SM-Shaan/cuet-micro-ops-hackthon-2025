@@ -1,15 +1,15 @@
-import { useState } from 'react';
-import { HealthStatus } from './components/HealthStatus';
-import { DownloadJobs } from './components/DownloadJobs';
-import { ErrorLog } from './components/ErrorLog';
-import { TraceViewer } from './components/TraceViewer';
-import { PerformanceMetrics } from './components/PerformanceMetrics';
-import { DownloadTester } from './components/DownloadTester';
+import { useState } from "react";
+import { HealthStatus } from "./components/HealthStatus";
+import { DownloadJobs } from "./components/DownloadJobs";
+import { ErrorLog } from "./components/ErrorLog";
+import { TraceViewer } from "./components/TraceViewer";
+import { PerformanceMetrics } from "./components/PerformanceMetrics";
+import { DownloadTester } from "./components/DownloadTester";
 
 function App() {
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'downloads' | 'traces'
-  >('dashboard');
+    "dashboard" | "downloads" | "traces"
+  >("dashboard");
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -26,7 +26,7 @@ function App() {
             <div className="flex items-center gap-4">
               <a
                 href={
-                  import.meta.env.VITE_JAEGER_UI_URL || 'http://localhost:16686'
+                  import.meta.env.VITE_JAEGER_UI_URL || "http://localhost:16686"
                 }
                 target="_blank"
                 rel="noopener noreferrer"
@@ -39,14 +39,14 @@ function App() {
 
           {/* Navigation Tabs */}
           <nav className="mt-4 flex gap-4">
-            {['dashboard', 'downloads', 'traces'].map((tab) => (
+            {["dashboard", "downloads", "traces"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as typeof activeTab)}
                 className={`px-4 py-2 rounded-lg transition-colors ${
                   activeTab === tab
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                    ? "bg-blue-500 text-white"
+                    : "text-gray-400 hover:text-white hover:bg-gray-700"
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -58,7 +58,7 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {activeTab === 'dashboard' && (
+        {activeTab === "dashboard" && (
           <div className="space-y-6">
             {/* Top Row: Health & Performance */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -77,14 +77,14 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'downloads' && (
+        {activeTab === "downloads" && (
           <div className="space-y-6">
             <DownloadTester />
             <DownloadJobs />
           </div>
         )}
 
-        {activeTab === 'traces' && (
+        {activeTab === "traces" && (
           <div className="space-y-6">
             <TraceViewer />
           </div>

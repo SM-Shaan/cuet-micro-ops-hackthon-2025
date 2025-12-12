@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 interface DownloadJob {
   id: string;
   fileId: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: "pending" | "processing" | "completed" | "failed";
   progress: number;
   startedAt: Date;
   completedAt?: Date;
@@ -20,7 +20,7 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
 
   // Load jobs from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('downloadJobs');
+    const stored = localStorage.getItem("downloadJobs");
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
@@ -28,11 +28,13 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
           parsed.map((job: DownloadJob) => ({
             ...job,
             startedAt: new Date(job.startedAt),
-            completedAt: job.completedAt ? new Date(job.completedAt) : undefined,
-          }))
+            completedAt: job.completedAt
+              ? new Date(job.completedAt)
+              : undefined,
+          })),
         );
       } catch {
-        console.error('Failed to parse stored jobs');
+        console.error("Failed to parse stored jobs");
       }
     }
   }, []);
@@ -50,27 +52,30 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
         }
 
         // Persist to localStorage
-        localStorage.setItem('downloadJobs', JSON.stringify(updated.slice(0, 50)));
+        localStorage.setItem(
+          "downloadJobs",
+          JSON.stringify(updated.slice(0, 50)),
+        );
 
         return updated;
       });
     };
 
     window.addEventListener(
-      'downloadJobUpdate',
-      handleJobUpdate as EventListener
+      "downloadJobUpdate",
+      handleJobUpdate as EventListener,
     );
     return () => {
       window.removeEventListener(
-        'downloadJobUpdate',
-        handleJobUpdate as EventListener
+        "downloadJobUpdate",
+        handleJobUpdate as EventListener,
       );
     };
   }, []);
 
   const clearJobs = () => {
     setJobs([]);
-    localStorage.removeItem('downloadJobs');
+    localStorage.removeItem("downloadJobs");
   };
 
   const displayJobs = limit ? jobs.slice(0, limit) : jobs;
@@ -107,18 +112,18 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm">{job.id.slice(0, 8)}</span>
+                  <span className="font-mono text-sm">
+                    {job.id.slice(0, 8)}
+                  </span>
                   <span className="text-gray-400">|</span>
                   <span className="text-sm">File: {job.fileId}</span>
                 </div>
-                <span
-                  className={`status-badge status-${job.status}`}
-                >
+                <span className={`status-badge status-${job.status}`}>
                   {job.status}
                 </span>
               </div>
 
-              {job.status === 'processing' && (
+              {job.status === "processing" && (
                 <div className="w-full bg-gray-600 rounded-full h-2">
                   <div
                     className="bg-blue-500 h-2 rounded-full transition-all duration-300"

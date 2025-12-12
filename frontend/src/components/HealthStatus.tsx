@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
-import { createSpan, getCurrentTraceId } from '../lib/tracing';
-import { addBreadcrumb } from '../lib/sentry';
+import { useState, useEffect } from "react";
+import { createSpan, getCurrentTraceId } from "../lib/tracing";
+import { addBreadcrumb } from "../lib/sentry";
 
 interface HealthData {
-  status: 'healthy' | 'unhealthy';
+  status: "healthy" | "unhealthy";
   checks: {
-    storage: 'ok' | 'error';
+    storage: "ok" | "error";
   };
 }
 
@@ -22,24 +22,24 @@ export function HealthStatus() {
 
     try {
       const data = await createSpan(
-        'health-check',
+        "health-check",
         async () => {
-          addBreadcrumb('Checking API health', 'api');
+          addBreadcrumb("Checking API health", "api");
 
-          const response = await fetch('/api/health');
+          const response = await fetch("/api/health");
           if (!response.ok) {
             throw new Error(`Health check failed: ${response.status}`);
           }
           return response.json();
         },
-        { 'health.endpoint': '/api/health' }
+        { "health.endpoint": "/api/health" },
       );
 
       setHealth(data);
       setLastChecked(new Date());
       setTraceId(getCurrentTraceId());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setError(err instanceof Error ? err.message : "Unknown error");
       setHealth(null);
     } finally {
       setLoading(false);
@@ -61,7 +61,7 @@ export function HealthStatus() {
           disabled={loading}
           className="text-sm text-blue-400 hover:text-blue-300 disabled:opacity-50"
         >
-          {loading ? 'Checking...' : 'Refresh'}
+          {loading ? "Checking..." : "Refresh"}
         </button>
       </div>
 
@@ -76,11 +76,11 @@ export function HealthStatus() {
           <div className="flex items-center gap-3">
             <div
               className={`w-3 h-3 rounded-full ${
-                health.status === 'healthy' ? 'bg-green-500' : 'bg-red-500'
+                health.status === "healthy" ? "bg-green-500" : "bg-red-500"
               }`}
             />
             <span className="text-lg font-medium">
-              {health.status === 'healthy' ? 'Healthy' : 'Unhealthy'}
+              {health.status === "healthy" ? "Healthy" : "Unhealthy"}
             </span>
           </div>
 
@@ -90,9 +90,9 @@ export function HealthStatus() {
               <span>Storage (S3)</span>
               <span
                 className={`status-badge ${
-                  health.checks.storage === 'ok'
-                    ? 'status-healthy'
-                    : 'status-unhealthy'
+                  health.checks.storage === "ok"
+                    ? "status-healthy"
+                    : "status-unhealthy"
                 }`}
               >
                 {health.checks.storage.toUpperCase()}

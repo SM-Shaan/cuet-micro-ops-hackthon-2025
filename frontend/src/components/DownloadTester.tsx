@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { createSpan, getCurrentTraceId } from '../lib/tracing';
-import { addBreadcrumb, captureError } from '../lib/sentry';
+import { useState } from "react";
+import { createSpan, getCurrentTraceId } from "../lib/tracing";
+import { addBreadcrumb, captureError } from "../lib/sentry";
 
 interface DownloadJob {
   id: string;
   fileId: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: "pending" | "processing" | "completed" | "failed";
   progress: number;
   startedAt: Date;
   completedAt?: Date;
@@ -20,12 +20,12 @@ export function DownloadTester() {
 
   const emitMetric = (type: string, value: number) => {
     window.dispatchEvent(
-      new CustomEvent('metricUpdate', { detail: { type, value } })
+      new CustomEvent("metricUpdate", { detail: { type, value } }),
     );
   };
 
   const emitJobUpdate = (job: DownloadJob) => {
-    window.dispatchEvent(new CustomEvent('downloadJobUpdate', { detail: job }));
+    window.dispatchEvent(new CustomEvent("downloadJobUpdate", { detail: job }));
   };
 
   const startDownload = async () => {
@@ -37,56 +37,56 @@ export function DownloadTester() {
     const job: DownloadJob = {
       id: crypto.randomUUID(),
       fileId,
-      status: 'processing',
+      status: "processing",
       progress: 0,
       startedAt: new Date(),
     };
 
     setCurrentJob(job);
     emitJobUpdate(job);
-    emitMetric('activeJobs', 1);
-    emitMetric('request', 1);
+    emitMetric("activeJobs", 1);
+    emitMetric("request", 1);
 
     try {
-      addBreadcrumb('Starting download', 'download', { fileId });
+      addBreadcrumb("Starting download", "download", { fileId });
 
       const result = await createSpan(
-        'download-start',
+        "download-start",
         async () => {
-          const response = await fetch('/api/v1/download/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const response = await fetch("/api/v1/download/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ file_id: fileId }),
           });
 
           if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.message || 'Download failed');
+            throw new Error(error.message || "Download failed");
           }
 
           return response.json();
         },
         {
-          'download.file_id': fileId,
-          'download.trace_id': getCurrentTraceId() || '',
-        }
+          "download.file_id": fileId,
+          "download.trace_id": getCurrentTraceId() || "",
+        },
       );
 
       const completedJob: DownloadJob = {
         ...job,
-        status: result.status === 'completed' ? 'completed' : 'failed',
+        status: result.status === "completed" ? "completed" : "failed",
         progress: 100,
         completedAt: new Date(),
         processingTimeMs: result.processingTimeMs,
-        error: result.status === 'failed' ? result.message : undefined,
+        error: result.status === "failed" ? result.message : undefined,
       };
 
       setCurrentJob(completedJob);
       emitJobUpdate(completedJob);
-      emitMetric('responseTime', result.processingTimeMs);
+      emitMetric("responseTime", result.processingTimeMs);
 
-      if (result.status === 'failed') {
-        emitMetric('error', 1);
+      if (result.status === "failed") {
+        emitMetric("error", 1);
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -94,7 +94,7 @@ export function DownloadTester() {
 
       const failedJob: DownloadJob = {
         ...job,
-        status: 'failed',
+        status: "failed",
         progress: 0,
         completedAt: new Date(),
         processingTimeMs: Date.now() - startTime,
@@ -103,40 +103,40 @@ export function DownloadTester() {
 
       setCurrentJob(failedJob);
       emitJobUpdate(failedJob);
-      emitMetric('responseTime', failedJob.processingTimeMs || 0);
-      emitMetric('error', 1);
+      emitMetric("responseTime", failedJob.processingTimeMs || 0);
+      emitMetric("error", 1);
     } finally {
       setLoading(false);
-      emitMetric('activeJobs', -1);
+      emitMetric("activeJobs", -1);
     }
   };
 
   const checkAvailability = async () => {
     try {
-      addBreadcrumb('Checking file availability', 'download', { fileId });
+      addBreadcrumb("Checking file availability", "download", { fileId });
 
       const result = await createSpan(
-        'download-check',
+        "download-check",
         async () => {
-          const response = await fetch('/api/v1/download/check', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const response = await fetch("/api/v1/download/check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ file_id: fileId }),
           });
 
           if (!response.ok) {
-            throw new Error('Check failed');
+            throw new Error("Check failed");
           }
 
           return response.json();
         },
-        { 'check.file_id': fileId }
+        { "check.file_id": fileId },
       );
 
       alert(
         result.available
           ? `File ${fileId} is available! Size: ${result.size} bytes`
-          : `File ${fileId} is not available`
+          : `File ${fileId} is not available`,
       );
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -172,8 +172,8 @@ export function DownloadTester() {
             disabled={loading}
             className={`flex-1 py-2 px-4 rounded font-medium transition-colors ${
               loading
-                ? 'bg-gray-600 cursor-not-allowed'
-                : 'bg-blue-500 hover:bg-blue-600'
+                ? "bg-gray-600 cursor-not-allowed"
+                : "bg-blue-500 hover:bg-blue-600"
             }`}
           >
             {loading ? (
@@ -197,7 +197,7 @@ export function DownloadTester() {
                 Processing...
               </span>
             ) : (
-              'Start Download'
+              "Start Download"
             )}
           </button>
 
@@ -215,9 +215,7 @@ export function DownloadTester() {
           <div className="bg-gray-700/50 rounded-lg p-4 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-400">Current Job</span>
-              <span
-                className={`status-badge status-${currentJob.status}`}
-              >
+              <span className={`status-badge status-${currentJob.status}`}>
                 {currentJob.status}
               </span>
             </div>
@@ -226,18 +224,19 @@ export function DownloadTester() {
               ID: {currentJob.id.slice(0, 8)}...
             </div>
 
-            {currentJob.status === 'processing' && (
+            {currentJob.status === "processing" && (
               <div className="w-full bg-gray-600 rounded-full h-2">
                 <div
                   className="bg-blue-500 h-2 rounded-full animate-pulse"
-                  style={{ width: '50%' }}
+                  style={{ width: "50%" }}
                 />
               </div>
             )}
 
             {currentJob.processingTimeMs && (
               <div className="text-sm text-gray-400">
-                Processing time: {(currentJob.processingTimeMs / 1000).toFixed(1)}s
+                Processing time:{" "}
+                {(currentJob.processingTimeMs / 1000).toFixed(1)}s
               </div>
             )}
 

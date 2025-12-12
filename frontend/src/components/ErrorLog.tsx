@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Sentry } from '../lib/sentry';
+import { useState, useEffect } from "react";
+import { Sentry } from "../lib/sentry";
 
 interface ErrorEntry {
   id: string;
@@ -22,35 +22,33 @@ export function ErrorLog({ limit }: ErrorLogProps) {
       setErrors((prev) => [event.detail, ...prev].slice(0, 100));
     };
 
-    window.addEventListener('appError', handleError as EventListener);
+    window.addEventListener("appError", handleError as EventListener);
 
     // Also capture console errors
     const originalError = console.error;
     console.error = (...args) => {
-      const message = args.map(String).join(' ');
+      const message = args.map(String).join(" ");
       const errorEntry: ErrorEntry = {
         id: crypto.randomUUID(),
         message,
         timestamp: new Date(),
-        traceId: sessionStorage.getItem('currentTraceId') || undefined,
+        traceId: sessionStorage.getItem("currentTraceId") || undefined,
       };
 
-      window.dispatchEvent(
-        new CustomEvent('appError', { detail: errorEntry })
-      );
+      window.dispatchEvent(new CustomEvent("appError", { detail: errorEntry }));
 
       originalError.apply(console, args);
     };
 
     return () => {
-      window.removeEventListener('appError', handleError as EventListener);
+      window.removeEventListener("appError", handleError as EventListener);
       console.error = originalError;
     };
   }, []);
 
   // Load errors from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('errorLog');
+    const stored = localStorage.getItem("errorLog");
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
@@ -58,38 +56,35 @@ export function ErrorLog({ limit }: ErrorLogProps) {
           parsed.map((e: ErrorEntry) => ({
             ...e,
             timestamp: new Date(e.timestamp),
-          }))
+          })),
         );
       } catch {
-        console.warn('Failed to parse stored errors');
+        console.warn("Failed to parse stored errors");
       }
     }
   }, []);
 
   // Persist errors
   useEffect(() => {
-    localStorage.setItem('errorLog', JSON.stringify(errors.slice(0, 50)));
+    localStorage.setItem("errorLog", JSON.stringify(errors.slice(0, 50)));
   }, [errors]);
 
   const clearErrors = () => {
     setErrors([]);
-    localStorage.removeItem('errorLog');
+    localStorage.removeItem("errorLog");
   };
 
   const triggerTestError = async () => {
     try {
-      const response = await fetch(
-        '/api/v1/download/check?sentry_test=true',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_id: 70000 }),
-        }
-      );
+      const response = await fetch("/api/v1/download/check?sentry_test=true", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: 70000 }),
+      });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Sentry test error triggered');
+        throw new Error(data.message || "Sentry test error triggered");
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -99,7 +94,7 @@ export function ErrorLog({ limit }: ErrorLogProps) {
         id: crypto.randomUUID(),
         message: error.message,
         timestamp: new Date(),
-        traceId: sessionStorage.getItem('currentTraceId') || undefined,
+        traceId: sessionStorage.getItem("currentTraceId") || undefined,
       };
 
       setErrors((prev) => [errorEntry, ...prev]);
@@ -147,7 +142,9 @@ export function ErrorLog({ limit }: ErrorLogProps) {
               className="bg-red-500/10 border border-red-500/20 rounded p-3"
             >
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm text-red-300 break-all">{error.message}</p>
+                <p className="text-sm text-red-300 break-all">
+                  {error.message}
+                </p>
                 <span className="text-xs text-gray-500 whitespace-nowrap">
                   {error.timestamp.toLocaleTimeString()}
                 </span>

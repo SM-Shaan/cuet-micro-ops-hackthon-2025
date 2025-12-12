@@ -1,16 +1,16 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import * as Sentry from '@sentry/react';
-import App from './App';
-import { initSentry } from './lib/sentry';
-import { initTracing } from './lib/tracing';
-import './index.css';
+import React from "react";
+import ReactDOM from "react-dom/client";
+import * as Sentry from "@sentry/react";
+import App from "./App";
+import { initSentry } from "./lib/sentry";
+import { initTracing } from "./lib/tracing";
+import "./index.css";
 
 // Initialize observability
 initSentry();
 initTracing();
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Sentry.ErrorBoundary
       fallback={({ error, resetError }) => (
@@ -20,7 +20,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               Something went wrong
             </h2>
             <p className="text-gray-400 mb-4">
-              {error instanceof Error ? error.message : 'An unexpected error occurred'}
+              {error instanceof Error
+                ? error.message
+                : "An unexpected error occurred"}
             </p>
             <button
               onClick={resetError}
@@ -35,5 +37,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     >
       <App />
     </Sentry.ErrorBoundary>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

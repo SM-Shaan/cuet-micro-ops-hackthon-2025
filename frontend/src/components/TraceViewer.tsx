@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export function TraceViewer() {
-  const [traceId, setTraceId] = useState('');
-  const jaegerUrl = import.meta.env.VITE_JAEGER_UI_URL || 'http://localhost:16686';
+  const [traceId, setTraceId] = useState("");
+  const jaegerUrl =
+    import.meta.env.VITE_JAEGER_UI_URL || "http://localhost:16686";
 
   const viewTrace = () => {
     if (traceId) {
-      window.open(`${jaegerUrl}/trace/${traceId}`, '_blank');
+      window.open(`${jaegerUrl}/trace/${traceId}`, "_blank");
     }
   };
 
-  const recentTraceId = sessionStorage.getItem('currentTraceId');
+  const recentTraceId = sessionStorage.getItem("currentTraceId");
 
   return (
     <div className="card">
@@ -19,9 +20,7 @@ export function TraceViewer() {
       <div className="space-y-4">
         {/* Jaeger Link */}
         <div className="bg-gray-700/50 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-gray-300 mb-2">
-            Jaeger UI
-          </h3>
+          <h3 className="text-sm font-medium text-gray-300 mb-2">Jaeger UI</h3>
           <p className="text-sm text-gray-400 mb-3">
             View distributed traces in the Jaeger UI to analyze request flows
             and identify performance bottlenecks.
@@ -71,7 +70,7 @@ export function TraceViewer() {
               </code>
               <button
                 onClick={() => {
-                  window.open(`${jaegerUrl}/trace/${recentTraceId}`, '_blank');
+                  window.open(`${jaegerUrl}/trace/${recentTraceId}`, "_blank");
                 }}
                 className="text-sm text-blue-400 hover:text-blue-300"
               >
@@ -92,8 +91,8 @@ export function TraceViewer() {
               trace with a unique ID.
             </p>
             <p>
-              2. The trace ID is propagated to the backend via the{' '}
-              <code className="bg-gray-800 px-1 rounded">traceparent</code>{' '}
+              2. The trace ID is propagated to the backend via the{" "}
+              <code className="bg-gray-800 px-1 rounded">traceparent</code>{" "}
               header.
             </p>
             <p>
@@ -106,9 +105,7 @@ export function TraceViewer() {
 
           <div className="mt-4 p-3 bg-gray-800 rounded font-mono text-xs">
             <div className="text-gray-500">// Example trace correlation</div>
-            <div className="text-green-400">
-              Frontend span: trace_id=abc123
-            </div>
+            <div className="text-green-400">Frontend span: trace_id=abc123</div>
             <div className="text-blue-400">
               API request: traceparent: 00-abc123-...
             </div>

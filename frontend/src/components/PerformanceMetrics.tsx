@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 interface Metric {
   name: string;
@@ -9,22 +9,24 @@ interface Metric {
 
 export function PerformanceMetrics() {
   const [metrics, setMetrics] = useState<Metric[]>([
-    { name: 'Avg Response Time', value: 0, unit: 'ms' },
-    { name: 'Success Rate', value: 100, unit: '%' },
-    { name: 'Total Requests', value: 0, unit: '' },
-    { name: 'Active Jobs', value: 0, unit: '' },
+    { name: "Avg Response Time", value: 0, unit: "ms" },
+    { name: "Success Rate", value: 100, unit: "%" },
+    { name: "Total Requests", value: 0, unit: "" },
+    { name: "Active Jobs", value: 0, unit: "" },
   ]);
 
   // Listen for metric updates
   useEffect(() => {
-    const updateMetrics = (event: CustomEvent<{ type: string; value: number }>) => {
+    const updateMetrics = (
+      event: CustomEvent<{ type: string; value: number }>,
+    ) => {
       const { type, value } = event.detail;
 
       setMetrics((prev) => {
         const updated = [...prev];
 
-        if (type === 'responseTime') {
-          const idx = updated.findIndex((m) => m.name === 'Avg Response Time');
+        if (type === "responseTime") {
+          const idx = updated.findIndex((m) => m.name === "Avg Response Time");
           if (idx >= 0) {
             const current = updated[idx].value;
             // Rolling average
@@ -35,8 +37,8 @@ export function PerformanceMetrics() {
           }
         }
 
-        if (type === 'request') {
-          const idx = updated.findIndex((m) => m.name === 'Total Requests');
+        if (type === "request") {
+          const idx = updated.findIndex((m) => m.name === "Total Requests");
           if (idx >= 0) {
             updated[idx] = {
               ...updated[idx],
@@ -45,14 +47,15 @@ export function PerformanceMetrics() {
           }
         }
 
-        if (type === 'error') {
-          const reqIdx = updated.findIndex((m) => m.name === 'Total Requests');
-          const successIdx = updated.findIndex((m) => m.name === 'Success Rate');
+        if (type === "error") {
+          const reqIdx = updated.findIndex((m) => m.name === "Total Requests");
+          const successIdx = updated.findIndex(
+            (m) => m.name === "Success Rate",
+          );
           if (reqIdx >= 0 && successIdx >= 0 && updated[reqIdx].value > 0) {
             const total = updated[reqIdx].value;
-            const errors = Math.round(
-              (total * (100 - updated[successIdx].value)) / 100
-            ) + 1;
+            const errors =
+              Math.round((total * (100 - updated[successIdx].value)) / 100) + 1;
             updated[successIdx] = {
               ...updated[successIdx],
               value: Math.round(((total - errors) / total) * 100),
@@ -60,8 +63,8 @@ export function PerformanceMetrics() {
           }
         }
 
-        if (type === 'activeJobs') {
-          const idx = updated.findIndex((m) => m.name === 'Active Jobs');
+        if (type === "activeJobs") {
+          const idx = updated.findIndex((m) => m.name === "Active Jobs");
           if (idx >= 0) {
             updated[idx] = {
               ...updated[idx],
@@ -74,37 +77,40 @@ export function PerformanceMetrics() {
       });
     };
 
-    window.addEventListener('metricUpdate', updateMetrics as EventListener);
+    window.addEventListener("metricUpdate", updateMetrics as EventListener);
     return () => {
-      window.removeEventListener('metricUpdate', updateMetrics as EventListener);
+      window.removeEventListener(
+        "metricUpdate",
+        updateMetrics as EventListener,
+      );
     };
   }, []);
 
   // Load from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('performanceMetrics');
+    const stored = localStorage.getItem("performanceMetrics");
     if (stored) {
       try {
         setMetrics(JSON.parse(stored));
       } catch {
-        console.warn('Failed to parse stored metrics');
+        console.warn("Failed to parse stored metrics");
       }
     }
   }, []);
 
   // Save to localStorage
   useEffect(() => {
-    localStorage.setItem('performanceMetrics', JSON.stringify(metrics));
+    localStorage.setItem("performanceMetrics", JSON.stringify(metrics));
   }, [metrics]);
 
   const resetMetrics = () => {
     setMetrics([
-      { name: 'Avg Response Time', value: 0, unit: 'ms' },
-      { name: 'Success Rate', value: 100, unit: '%' },
-      { name: 'Total Requests', value: 0, unit: '' },
-      { name: 'Active Jobs', value: 0, unit: '' },
+      { name: "Avg Response Time", value: 0, unit: "ms" },
+      { name: "Success Rate", value: 100, unit: "%" },
+      { name: "Total Requests", value: 0, unit: "" },
+      { name: "Active Jobs", value: 0, unit: "" },
     ]);
-    localStorage.removeItem('performanceMetrics');
+    localStorage.removeItem("performanceMetrics");
   };
 
   return (
