@@ -5,13 +5,13 @@
     "node": ">=24.10.0"
   },
   "scripts": {
-    "dev": "DOWNLOAD_DELAY_MIN_MS=5000 DOWNLOAD_DELAY_MAX_MS=15000 node --env-file=.env --experimental-transform-types --watch src/index.ts",
-    "start": "DOWNLOAD_DELAY_MIN_MS=10000 DOWNLOAD_DELAY_MAX_MS=120000 node --env-file=.env --experimental-transform-types src/index.ts",
+    "dev": "DOWNLOAD_DELAY_MIN_MS=5000 DOWNLOAD_DELAY_MAX_MS=15000 node --env-file=.env --watch src/index.js",
+    "start": "DOWNLOAD_DELAY_MIN_MS=10000 DOWNLOAD_DELAY_MAX_MS=120000 node --env-file=.env src/index.js",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:e2e": "node --experimental-transform-types scripts/run-e2e.ts",
+    "test:e2e": "node scripts/run-e2e.js",
     "docker:dev": "docker compose -f docker/compose.dev.yml up --build",
     "docker:prod": "docker compose -f docker/compose.prod.yml up --build -d"
   },
@@ -35,8 +35,6 @@
   },
   "devDependencies": {
     "@hono/eslint-config": "^2.0.3",
-    "@types/node": "^24.10.2",
-    "prettier": "^3.7.4",
-    "typescript": "^5.8.3"
+    "prettier": "^3.7.4"
   }
 }

@@ -1,9 +1,9 @@
 /**
  * Run E2E Tests with Server Management
- * Usage: node --experimental-transform-types scripts/run-e2e.ts
+ * Usage: node scripts/run-e2e.js
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectDir = path.dirname(__dirname);
 
-async function fileExists(filePath: string): Promise<boolean> {
+async function fileExists(filePath) {
   try {
     await access(filePath);
     return true;
@@ -28,9 +28,9 @@ const colors = {
   reset: "\x1b[0m",
 };
 
-let serverProcess: ChildProcess | null = null;
+let serverProcess = null;
 
-function cleanup(): void {
+function cleanup() {
   console.log();
   console.log(`${colors.yellow}Cleaning up...${colors.reset}`);
   if (serverProcess && !serverProcess.killed) {
@@ -49,7 +49,7 @@ process.on("SIGTERM", () => {
   process.exit(1);
 });
 
-async function waitForServer(maxAttempts = 30): Promise<boolean> {
+async function waitForServer(maxAttempts = 30) {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const response = await fetch("http://localhost:3000/health");
@@ -65,7 +65,7 @@ async function waitForServer(maxAttempts = 30): Promise<boolean> {
   return false;
 }
 
-async function startServer(): Promise<ChildProcess> {
+async function startServer() {
   console.log(`${colors.yellow}Starting server...${colors.reset}`);
 
   // Check if .env file exists, use --env-file only if it does
@@ -75,25 +75,20 @@ async function startServer(): Promise<ChildProcess> {
       ? ["--env-file=.env"]
       : [];
 
-  const server = spawn(
-    "node",
-    [...envFileArg, "--experimental-transform-types", "src/index.ts"],
-    {
-      cwd: projectDir,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env },
-    },
-  );
+  const server = spawn("node", [...envFileArg, "src/index.js"], {
+    cwd: projectDir,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env },
+  });
 
-  server.stdout?.on("data", (data: Buffer) => {
+  server.stdout?.on("data", (data) => {
     const output = data.toString().trim();
     if (output) console.log(`[server] ${output}`);
   });
 
-  server.stderr?.on("data", (data: Buffer) => {
+  server.stderr?.on("data", (data) => {
     const output = data.toString().trim();
-    // Filter out experimental warning
-    if (output && !output.includes("ExperimentalWarning")) {
+    if (output) {
       console.error(`[server] ${output}`);
     }
   });
@@ -101,20 +96,16 @@ async function startServer(): Promise<ChildProcess> {
   return server;
 }
 
-async function runTests(): Promise<number> {
+async function runTests() {
   console.log();
   console.log(`${colors.yellow}Running E2E tests...${colors.reset}`);
   console.log();
 
   return new Promise((resolve) => {
-    const testProcess = spawn(
-      "node",
-      ["--experimental-transform-types", "scripts/e2e-test.ts"],
-      {
-        cwd: projectDir,
-        stdio: "inherit",
-      },
-    );
+    const testProcess = spawn("node", ["scripts/e2e-test.js"], {
+      cwd: projectDir,
+      stdio: "inherit",
+    });
 
     testProcess.on("close", (code) => {
       resolve(code ?? 1);
@@ -122,7 +113,7 @@ async function runTests(): Promise<number> {
   });
 }
 
-async function main(): Promise<void> {
+async function main() {
   try {
     // Start server
     serverProcess = await startServer();

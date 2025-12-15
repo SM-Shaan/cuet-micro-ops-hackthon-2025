@@ -94,14 +94,10 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_SENTRY_DSN=${SENTRY_DSN}
     expose:
       - "80"
-    env_file:
-      - ../.env
-    environment:
-      - VITE_SENTRY_DSN=${SENTRY_DSN:-}
-      - VITE_OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      - VITE_JAEGER_UI_URL=${JAEGER_UI_URL:-}
     restart: unless-stopped
     networks:
       - delineate-network

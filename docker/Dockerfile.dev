@@ -10,6 +10,6 @@ COPY . .
 
 EXPOSE 3000
 
-# Use direct node command with experimental TypeScript support
+# Use direct node command with watch mode
 # Environment variables are passed via Docker Compose
-CMD ["node", "--experimental-transform-types", "--watch", "src/index.ts"]
+CMD ["node", "--watch", "src/index.js"]

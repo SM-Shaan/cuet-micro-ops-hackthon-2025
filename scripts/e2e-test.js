@@ -1,6 +1,6 @@
 /**
  * E2E Test Script for Delineate Hackathon Challenge API
- * Usage: node --experimental-transform-types scripts/e2e-test.ts [BASE_URL]
+ * Usage: node scripts/e2e-test.js [BASE_URL]
  */
 
 const BASE_URL = process.argv[2] ?? "http://localhost:3000";
@@ -13,21 +13,15 @@ const colors = {
   reset: "\x1b[0m",
 };
 
-interface TestResult {
-  passed: number;
-  failed: number;
-  total: number;
-}
+const results = { passed: 0, failed: 0, total: 0 };
 
-const results: TestResult = { passed: 0, failed: 0, total: 0 };
-
-function logPass(message: string): void {
+function logPass(message) {
   console.log(`${colors.green}✓ PASS${colors.reset}: ${message}`);
   results.passed++;
   results.total++;
 }
 
-function logFail(message: string, expected: string, got: string): void {
+function logFail(message, expected, got) {
   console.log(`${colors.red}✗ FAIL${colors.reset}: ${message}`);
   console.log(`  ${colors.yellow}Expected${colors.reset}: ${expected}`);
   console.log(`  ${colors.yellow}Got${colors.reset}: ${got}`);
@@ -35,12 +29,12 @@ function logFail(message: string, expected: string, got: string): void {
   results.total++;
 }
 
-function logSection(title: string): void {
+function logSection(title) {
   console.log();
   console.log(`${colors.yellow}=== ${title} ===${colors.reset}`);
 }
 
-async function waitForServer(): Promise<void> {
+async function waitForServer() {
   console.log(`Waiting for server at ${BASE_URL}...`);
   for (let i = 0; i < 30; i++) {
     try {
@@ -58,11 +52,11 @@ async function waitForServer(): Promise<void> {
   throw new Error("Server did not start in time");
 }
 
-async function testRoot(): Promise<void> {
+async function testRoot() {
   logSection("Root Endpoint");
 
   const response = await fetch(`${BASE_URL}/`);
-  const data = (await response.json()) as { message?: string };
+  const data = await response.json();
 
   if (data.message === "Hello Hono!") {
     logPass("Root returns welcome message");
@@ -75,14 +69,11 @@ async function testRoot(): Promise<void> {
   }
 }
 
-async function testHealth(): Promise<void> {
+async function testHealth() {
   logSection("Health Endpoint");
 
   const response = await fetch(`${BASE_URL}/health`);
-  const data = (await response.json()) as {
-    status?: string;
-    checks?: { storage?: string };
-  };
+  const data = await response.json();
 
   // Accept 200 (healthy) or 503 (unhealthy - storage unavailable)
   if (response.status === 200 || response.status === 503) {
@@ -121,7 +112,7 @@ async function testHealth(): Promise<void> {
   }
 }
 
-async function testSecurityHeaders(): Promise<void> {
+async function testSecurityHeaders() {
   logSection("Security Headers");
 
   const response = await fetch(`${BASE_URL}/`);
@@ -198,7 +189,7 @@ async function testSecurityHeaders(): Promise<void> {
   }
 }
 
-async function testDownloadInitiate(): Promise<void> {
+async function testDownloadInitiate() {
   logSection("Download Initiate Endpoint");
 
   // Valid request
@@ -207,11 +198,7 @@ async function testDownloadInitiate(): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file_ids: [10000, 20000, 30000] }),
   });
-  const data = (await response.json()) as {
-    jobId?: string;
-    status?: string;
-    totalFileIds?: number;
-  };
+  const data = await response.json();
 
   if (data.jobId) {
     logPass("Download initiate returns jobId");
@@ -278,7 +265,7 @@ async function testDownloadInitiate(): Promise<void> {
   }
 }
 
-async function testDownloadCheck(): Promise<void> {
+async function testDownloadCheck() {
   logSection("Download Check Endpoint");
 
   // Valid request - file exists (70000 was uploaded earlier)
@@ -287,10 +274,7 @@ async function testDownloadCheck(): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file_id: 70000 }),
   });
-  const data = (await response.json()) as {
-    file_id?: number;
-    available?: boolean;
-  };
+  const data = await response.json();
 
   if (data.file_id === 70000) {
     logPass("Download check returns correct file_id");
@@ -318,7 +302,7 @@ async function testDownloadCheck(): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file_id: 99999 }),
   });
-  const data2 = (await response2.json()) as { file_id?: number };
+  const data2 = await response2.json();
 
   if (data2.file_id === 99999) {
     logPass("Download check returns correct file_id for non-existent file");
@@ -365,7 +349,7 @@ async function testDownloadCheck(): Promise<void> {
   }
 }
 
-async function testRequestId(): Promise<void> {
+async function testRequestId() {
   logSection("Request ID Tracking");
 
   // Check that custom request ID is respected
@@ -401,7 +385,7 @@ async function testRequestId(): Promise<void> {
   }
 }
 
-async function testContentType(): Promise<void> {
+async function testContentType() {
   logSection("Content-Type Validation");
 
   // POST with invalid JSON should fail
@@ -445,7 +429,7 @@ async function testContentType(): Promise<void> {
   }
 }
 
-async function testMethodNotAllowed(): Promise<void> {
+async function testMethodNotAllowed() {
   logSection("Method Validation");
 
   // DELETE on root should return 404 or 405
@@ -475,7 +459,7 @@ async function testMethodNotAllowed(): Promise<void> {
   }
 }
 
-async function testRateLimiting(): Promise<void> {
+async function testRateLimiting() {
   logSection("Rate Limiting");
 
   // Get initial remaining count
@@ -504,7 +488,7 @@ async function testRateLimiting(): Promise<void> {
   }
 }
 
-function printSummary(): void {
+function printSummary() {
   console.log();
   console.log(`${colors.yellow}==============================${colors.reset}`);
   console.log(`${colors.yellow}        TEST SUMMARY          ${colors.reset}`);
@@ -521,7 +505,7 @@ function printSummary(): void {
   }
 }
 
-async function main(): Promise<void> {
+async function main() {
   console.log("E2E Tests for Delineate Hackathon Challenge API");
   console.log(`Base URL: ${BASE_URL}`);
   console.log();

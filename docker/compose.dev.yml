@@ -79,11 +79,11 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_SENTRY_DSN=${SENTRY_DSN}
     ports:
       - "5173:80"
     environment:
-      - VITE_SENTRY_DSN=${SENTRY_DSN:-}
-      - VITE_OTEL_EXPORTER_OTLP_ENDPOINT=http://delineate-jaeger:4318
       - VITE_JAEGER_UI_URL=http://localhost:16686
     depends_on:
       - delineate-app

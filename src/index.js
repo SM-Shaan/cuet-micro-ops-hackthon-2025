@@ -1,10 +1,7 @@
-// Initialize OTEL and Sentry first - must be at the top
-// eslint-disable-next-line import-x/order
-import { Sentry, shutdownOtel } from "./instrument.ts";
+import { Sentry, shutdownOtel } from "./instrument.js";
 
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { serve } from "@hono/node-server";
-import type { ServerType } from "@hono/node-server";
 import { httpInstrumentationMiddleware } from "@hono/otel";
 import { sentry } from "@hono/sentry";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
@@ -74,37 +71,32 @@ const s3Client = new S3Client({
 
 // Redis Client with fallback support
 let redisConnected = false;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-const redis: Redis = new Redis(env.REDIS_URL, {
+const redis = new Redis(env.REDIS_URL, {
   maxRetriesPerRequest: 3,
   retryDelayOnFailover: 100,
   lazyConnect: true,
   enableOfflineQueue: false, // Don't queue commands when disconnected
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-redis.on("error", (err: Error) => {
+redis.on("error", (err) => {
   if (redisConnected) {
     console.error("[Redis] Connection error:", err.message);
   }
   redisConnected = false;
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
 redis.on("connect", () => {
   redisConnected = true;
   console.log("[Redis] Connected to", env.REDIS_URL);
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
 redis.on("ready", () => {
   redisConnected = true;
   console.log("[Redis] Ready");
 });
 
 // Connect to Redis immediately (don't wait for first command)
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-redis.connect().catch((err: Error) => {
+redis.connect().catch((err) => {
   console.error("[Redis] Initial connection failed:", err.message);
 });
 
@@ -181,7 +173,7 @@ const ErrorResponseSchema = z
 // Error handler with Sentry
 app.onError((err, c) => {
   c.get("sentry").captureException(err);
-  const requestId = c.get("requestId") as string | undefined;
+  const requestId = c.get("requestId");
   return c.json(
     {
       error: "Internal Server Error",
@@ -346,7 +338,7 @@ const DownloadStatusResponseSchema = z
   .openapi("DownloadStatusResponse");
 
 // Input sanitization for S3 keys - prevent path traversal
-const sanitizeS3Key = (fileId: number): string => {
+const sanitizeS3Key = (fileId) => {
   // Ensure fileId is a valid integer within bounds (already validated by Zod)
   const sanitizedId = Math.floor(Math.abs(fileId));
   // Construct safe S3 key without user-controlled path components
@@ -354,7 +346,7 @@ const sanitizeS3Key = (fileId: number): string => {
 };
 
 // S3 health check
-const checkS3Health = async (): Promise<boolean> => {
+const checkS3Health = async () => {
   if (!env.S3_BUCKET_NAME || env.S3_MOCK_MODE) return true; // Mock mode
   try {
     // Use a lightweight HEAD request on a known path
@@ -373,13 +365,7 @@ const checkS3Health = async (): Promise<boolean> => {
 };
 
 // S3 availability check
-const checkS3Availability = async (
-  fileId: number,
-): Promise<{
-  available: boolean;
-  s3Key: string | null;
-  size: number | null;
-}> => {
+const checkS3Availability = async (fileId) => {
   const s3Key = sanitizeS3Key(fileId);
 
   // If no bucket configured or mock mode enabled, use mock mode
@@ -413,80 +399,56 @@ const checkS3Availability = async (
 };
 
 // Random delay helper for simulating long-running downloads
-const getRandomDelay = (): number => {
+const getRandomDelay = () => {
   if (!env.DOWNLOAD_DELAY_ENABLED) return 0;
   const min = env.DOWNLOAD_DELAY_MIN_MS;
   const max = env.DOWNLOAD_DELAY_MAX_MS;
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ============================================================================
 // JOB STORE - Async Polling Pattern Implementation (Challenge 2)
 // Using Redis for production-ready distributed job storage
 // ============================================================================
 
-// Download Job Interface
-interface DownloadJob {
-  jobId: string;
-  userId: string;
-  fileId: number;
-  status: "queued" | "processing" | "completed" | "failed";
-  progress: number; // 0-100
-  createdAt: number;
-  updatedAt: number;
-  completedAt?: number;
-  downloadUrl?: string | null;
-  size?: number | null;
-  processingTimeMs?: number;
-  message?: string;
-  error?: string;
-  estimatedDelayMs?: number;
-}
-
 // Redis key helper
-const getRedisKey = (userId: string): string =>
-  `${env.REDIS_KEY_PREFIX}${userId}`;
+const getRedisKey = (userId) => `${env.REDIS_KEY_PREFIX}${userId}`;
 
 // Redis job store helper functions
 const jobStore = {
-  async get(userId: string): Promise<DownloadJob | null> {
+  async get(userId) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const data = await redis.get(getRedisKey(userId));
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      return data ? (JSON.parse(data) as DownloadJob) : null;
-    } catch (err: unknown) {
+      return data ? JSON.parse(data) : null;
+    } catch (err) {
       console.error(`[Redis] Error getting job for userId=${userId}:`, err);
       return null;
     }
   },
 
-  async set(userId: string, job: DownloadJob): Promise<void> {
+  async set(userId, job) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await redis.setex(
         getRedisKey(userId),
         env.REDIS_JOB_TTL_SECONDS,
         JSON.stringify(job),
       );
-    } catch (err: unknown) {
+    } catch (err) {
       console.error(`[Redis] Error setting job for userId=${userId}:`, err);
     }
   },
 
-  async delete(userId: string): Promise<void> {
+  async delete(userId) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await redis.del(getRedisKey(userId));
-    } catch (err: unknown) {
+    } catch (err) {
       console.error(`[Redis] Error deleting job for userId=${userId}:`, err);
     }
   },
 
-  async updateProgress(userId: string, progress: number): Promise<void> {
+  async updateProgress(userId, progress) {
     const job = await this.get(userId);
     if (job) {
       job.progress = progress;
@@ -497,7 +459,7 @@ const jobStore = {
 };
 
 // Background job processor
-const processDownloadJob = async (userId: string): Promise<void> => {
+const processDownloadJob = async (userId) => {
   const job = await jobStore.get(userId);
   if (!job) return;
 
@@ -522,7 +484,7 @@ const processDownloadJob = async (userId: string): Promise<void> => {
   const progressInterval = setInterval(() => {
     const elapsed = Date.now() - startTime;
     const progress = Math.min(Math.floor((elapsed / delayMs) * 100), 99);
-    jobStore.updateProgress(userId, progress).catch((err: unknown) => {
+    jobStore.updateProgress(userId, progress).catch((err) => {
       console.error(`[Download] Progress update error: ${String(err)}`);
     });
   }, 1000);
@@ -769,7 +731,7 @@ app.openapi(downloadInitiateRoute, (c) => {
   return c.json(
     {
       jobId,
-      status: "queued" as const,
+      status: "queued",
       totalFileIds: file_ids.length,
     },
     200,
@@ -913,7 +875,7 @@ app.openapi(downloadStartRoute, async (c) => {
 
   // Create new job
   const jobId = crypto.randomUUID();
-  const job: DownloadJob = {
+  const job = {
     jobId,
     userId: user_id,
     fileId: file_id,
@@ -931,7 +893,7 @@ app.openapi(downloadStartRoute, async (c) => {
   );
 
   // Start background processing (non-blocking - don't await!)
-  processDownloadJob(user_id).catch((err: unknown) => {
+  processDownloadJob(user_id).catch((err) => {
     console.error(`[Download] Background processing error: ${String(err)}`);
   });
 
@@ -941,7 +903,7 @@ app.openapi(downloadStartRoute, async (c) => {
       jobId,
       userId: user_id,
       fileId: file_id,
-      status: "queued" as const,
+      status: "queued",
       message: "Download job queued. Poll the status URL for updates.",
       pollUrl: `/v1/download/status/${user_id}`,
     },
@@ -961,7 +923,7 @@ app.openapi(downloadStatusRoute, async (c) => {
       {
         error: "Not Found",
         message: "No active download job found for this user",
-        requestId: c.get("requestId") as string,
+        requestId: c.get("requestId"),
       },
       404,
     );
@@ -1004,7 +966,7 @@ if (env.NODE_ENV !== "production") {
 }
 
 // Graceful shutdown handler
-const gracefulShutdown = (server: ServerType) => (signal: string) => {
+const gracefulShutdown = (server) => (signal) => {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
 
   // Stop accepting new connections
@@ -1013,18 +975,17 @@ const gracefulShutdown = (server: ServerType) => (signal: string) => {
 
     // Shutdown OpenTelemetry to flush traces
     shutdownOtel()
-      .catch((err: unknown) => {
+      .catch((err) => {
         console.error("Error shutting down OpenTelemetry:", err);
       })
       .finally(() => {
         // Disconnect Redis
-        /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
         redis
           .quit()
           .then(() => {
             console.log("Redis client disconnected");
           })
-          .catch((err: unknown) => {
+          .catch((err) => {
             console.error("Error disconnecting Redis:", err);
           })
           .finally(() => {
@@ -1033,7 +994,6 @@ const gracefulShutdown = (server: ServerType) => (signal: string) => {
             console.log("S3 client destroyed");
             console.log("Graceful shutdown completed");
           });
-        /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
       });
   });
 };

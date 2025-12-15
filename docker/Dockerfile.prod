@@ -27,7 +27,7 @@ EXPOSE 3000
 ENTRYPOINT ["/sbin/tini", "--"]
 
 # Run node directly instead of npm for faster startup and cleaner process tree
-CMD ["node", "--experimental-transform-types", "src/index.ts"]
+CMD ["node", "src/index.js"]
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

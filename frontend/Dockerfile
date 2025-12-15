@@ -2,6 +2,10 @@ FROM node:24-alpine AS builder
 
 WORKDIR /app
 
+# Build arguments for Vite environment variables
+ARG VITE_SENTRY_DSN
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+
 COPY package*.json ./
 RUN npm ci
 
