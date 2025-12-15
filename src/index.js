@@ -1,3 +1,4 @@
+// eslint-disable-next-line import-x/order
 import { Sentry, shutdownOtel } from "./instrument.js";
 
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
