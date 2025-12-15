@@ -309,9 +309,8 @@ export function DownloadTester() {
             {currentJob.downloadUrl && currentJob.status === "completed" && (
               <div className="text-sm">
                 <a
-                  href={currentJob.downloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={`/api${currentJob.downloadUrl}`}
+                  download
                   className="text-blue-400 hover:text-blue-300 underline"
                 >
                   Download File

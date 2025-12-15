@@ -1,7 +1,13 @@
 // eslint-disable-next-line import-x/order
 import { Sentry, shutdownOtel } from "./instrument.js";
 
-import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { serve } from "@hono/node-server";
 import { httpInstrumentationMiddleware } from "@hono/otel";
 import { sentry } from "@hono/sentry";
@@ -31,8 +37,8 @@ const EnvSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_ENDPOINT: optionalUrl,
   S3_BUCKET_NAME: z.string().default(""),
-  S3_FORCE_PATH_STYLE: z.coerce.boolean().default(false),
-  S3_MOCK_MODE: z.coerce.boolean().default(false),
+  S3_FORCE_PATH_STYLE: z.string().optional().transform((val) => val === "true").default(false),
+  S3_MOCK_MODE: z.string().optional().transform((val) => val === "true").default(false),
   SENTRY_DSN: optionalUrl,
   OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
   REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30000),
@@ -46,7 +52,7 @@ const EnvSchema = z.object({
   DOWNLOAD_DELAY_MIN_MS: z.coerce.number().int().min(0).default(10000), // 10 seconds
   // DOWNLOAD_DELAY_MAX_MS: z.coerce.number().int().min(0).default(200000), // 200 seconds
   DOWNLOAD_DELAY_MAX_MS: z.coerce.number().int().min(0).default(20000), // 200 seconds
-  DOWNLOAD_DELAY_ENABLED: z.coerce.boolean().default(true),
+  DOWNLOAD_DELAY_ENABLED: z.string().optional().transform((val) => val !== "false").default(true),
   // Redis configuration
   REDIS_URL: z.string().default("redis://localhost:6379"),
   REDIS_KEY_PREFIX: z.string().default("download:"),
@@ -507,7 +513,7 @@ const processDownloadJob = async (userId) => {
 
     if (s3Result.available) {
       job.status = "completed";
-      job.downloadUrl = `https://storage.example.com/${s3Result.s3Key ?? ""}?token=${crypto.randomUUID()}`;
+      job.downloadUrl = `/v1/download/file/${String(job.fileId)}`;
       job.size = s3Result.size;
       job.message = `Download ready after ${(processingTimeMs / 1000).toFixed(1)} seconds`;
     } else {
@@ -948,6 +954,355 @@ app.openapi(downloadStatusRoute, async (c) => {
     },
     200,
   );
+});
+
+// ============================================================================
+// FILE UPLOAD API - Upload files to S3 bucket
+// ============================================================================
+
+// Upload response schema
+const UploadResponseSchema = z
+  .object({
+    success: z.boolean(),
+    fileId: z.number().int(),
+    s3Key: z.string(),
+    size: z.number().int(),
+    message: z.string(),
+  })
+  .openapi("UploadResponse");
+
+// List files response schema
+const ListFilesResponseSchema = z
+  .object({
+    files: z.array(
+      z.object({
+        key: z.string(),
+        size: z.number().int(),
+        lastModified: z.string(),
+        fileId: z.number().int().nullable(),
+      }),
+    ),
+    totalCount: z.number().int(),
+  })
+  .openapi("ListFilesResponse");
+
+// Upload file route
+const uploadFileRoute = createRoute({
+  method: "post",
+  path: "/v1/upload",
+  tags: ["Upload"],
+  summary: "Upload a file to S3",
+  description: "Upload a file to the S3 bucket with a specified file ID",
+  request: {
+    body: {
+      content: {
+        "multipart/form-data": {
+          schema: z.object({
+            file: z.any().openapi({ description: "File to upload" }),
+            file_id: z.string().openapi({ description: "File ID (10000-100000000)" }),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "File uploaded successfully",
+      content: {
+        "application/json": {
+          schema: UploadResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request",
+      content: {
+        "application/json": {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Upload failed",
+      content: {
+        "application/json": {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+  },
+});
+
+// List files route
+const listFilesRoute = createRoute({
+  method: "get",
+  path: "/v1/files",
+  tags: ["Upload"],
+  summary: "List files in S3 bucket",
+  description: "List all files in the downloads S3 bucket",
+  responses: {
+    200: {
+      description: "List of files",
+      content: {
+        "application/json": {
+          schema: ListFilesResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Failed to list files",
+      content: {
+        "application/json": {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+  },
+});
+
+// Upload file handler
+app.openapi(uploadFileRoute, async (c) => {
+  try {
+    const formData = await c.req.formData();
+    const file = formData.get("file");
+    const fileIdStr = formData.get("file_id");
+
+    if (!file || !(file instanceof File)) {
+      return c.json(
+        {
+          error: "Bad Request",
+          message: "No file provided",
+          requestId: c.get("requestId"),
+        },
+        400,
+      );
+    }
+
+    const fileId = parseInt(fileIdStr, 10);
+    if (isNaN(fileId) || fileId < 10000 || fileId > 100000000) {
+      return c.json(
+        {
+          error: "Bad Request",
+          message: "file_id must be between 10000 and 100000000",
+          requestId: c.get("requestId"),
+        },
+        400,
+      );
+    }
+
+    const s3Key = `downloads/${fileId}.zip`;
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Upload to S3 with original filename in metadata
+    const command = new PutObjectCommand({
+      Bucket: env.S3_BUCKET_NAME,
+      Key: s3Key,
+      Body: buffer,
+      ContentType: file.type || "application/octet-stream",
+      Metadata: {
+        "original-filename": encodeURIComponent(file.name),
+      },
+    });
+
+    await s3Client.send(command);
+
+    console.log(`[Upload] File uploaded: ${s3Key} (${buffer.length} bytes)`);
+
+    return c.json(
+      {
+        success: true,
+        fileId,
+        s3Key,
+        size: buffer.length,
+        message: `File uploaded successfully as ${s3Key}`,
+      },
+      200,
+    );
+  } catch (error) {
+    console.error("[Upload] Error:", error);
+    return c.json(
+      {
+        error: "Upload Failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+        requestId: c.get("requestId"),
+      },
+      500,
+    );
+  }
+});
+
+// List files handler
+app.openapi(listFilesRoute, async (c) => {
+  try {
+    // If mock mode, return empty list
+    if (env.S3_MOCK_MODE || !env.S3_BUCKET_NAME) {
+
+      return c.json(
+        {
+          files: [],
+          totalCount: 0,
+        },
+        200,
+      );
+    }
+
+    const command = new ListObjectsV2Command({
+      Bucket: env.S3_BUCKET_NAME,
+    });
+
+    const response = await s3Client.send(command);
+    const files = (response.Contents || []).map((obj) => {
+      // Extract file ID from key (e.g., "downloads/12345.zip" -> 12345)
+      const match = obj.Key?.match(/downloads\/(\d+)\.zip/);
+      const fileId = match ? parseInt(match[1], 10) : null;
+
+      return {
+        key: obj.Key || "",
+        size: obj.Size || 0,
+        lastModified: obj.LastModified?.toISOString() || "",
+        fileId,
+      };
+    });
+
+    return c.json(
+      {
+        files,
+        totalCount: files.length,
+      },
+      200,
+    );
+  } catch (error) {
+    console.error("[ListFiles] Error:", error);
+    return c.json(
+      {
+        error: "List Failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+        requestId: c.get("requestId"),
+      },
+      500,
+    );
+  }
+});
+
+// ============================================================================
+// FILE DOWNLOAD ENDPOINT - Stream files from S3
+// ============================================================================
+
+// Download file route
+const downloadFileRoute = createRoute({
+  method: "get",
+  path: "/v1/download/file/{fileId}",
+  tags: ["Download"],
+  summary: "Download a file from S3",
+  description: "Stream a file directly from S3 storage",
+  request: {
+    params: z.object({
+      fileId: z.string().openapi({ description: "File ID to download" }),
+    }),
+  },
+  responses: {
+    200: {
+      description: "File stream",
+      content: {
+        "application/octet-stream": {
+          schema: z.any(),
+        },
+      },
+    },
+    404: {
+      description: "File not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Download failed",
+      content: {
+        "application/json": {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
+  },
+});
+
+// Download file handler
+app.openapi(downloadFileRoute, async (c) => {
+  const { fileId } = c.req.valid("param");
+  const fileIdNum = parseInt(fileId, 10);
+
+  if (isNaN(fileIdNum) || fileIdNum < 10000 || fileIdNum > 100000000) {
+    return c.json(
+      {
+        error: "Bad Request",
+        message: "Invalid file ID",
+        requestId: c.get("requestId"),
+      },
+      400,
+    );
+  }
+
+  const s3Key = sanitizeS3Key(fileIdNum);
+
+  try {
+    const command = new GetObjectCommand({
+      Bucket: env.S3_BUCKET_NAME,
+      Key: s3Key,
+    });
+
+    const response = await s3Client.send(command);
+
+    if (!response.Body) {
+      return c.json(
+        {
+          error: "Not Found",
+          message: "File not found",
+          requestId: c.get("requestId"),
+        },
+        404,
+      );
+    }
+
+    // Get original filename from metadata, fallback to fileId
+    const originalFilename = response.Metadata?.["original-filename"]
+      ? decodeURIComponent(response.Metadata["original-filename"])
+      : `${fileId}.zip`;
+
+    // Set headers for file download
+    c.header("Content-Type", response.ContentType || "application/octet-stream");
+    c.header("Content-Length", String(response.ContentLength || 0));
+    c.header("Content-Disposition", `attachment; filename="${originalFilename}"`);
+
+    // Stream the response
+    return new Response(response.Body, {
+      status: 200,
+      headers: c.res.headers,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "NoSuchKey") {
+      return c.json(
+        {
+          error: "Not Found",
+          message: "File not found in storage",
+          requestId: c.get("requestId"),
+        },
+        404,
+      );
+    }
+
+    console.error("[Download] Error:", error);
+    return c.json(
+      {
+        error: "Download Failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+        requestId: c.get("requestId"),
+      },
+      500,
+    );
+  }
 });
 
 // OpenAPI spec endpoint (disabled in production)

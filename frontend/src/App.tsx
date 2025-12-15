@@ -5,10 +5,11 @@ import { ErrorLog } from "./components/ErrorLog";
 import { TraceViewer } from "./components/TraceViewer";
 import { PerformanceMetrics } from "./components/PerformanceMetrics";
 import { DownloadTester } from "./components/DownloadTester";
+import { FileUpload } from "./components/FileUpload";
 
 function App() {
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "downloads" | "traces"
+    "dashboard" | "downloads" | "upload" | "traces"
   >("dashboard");
 
   return (
@@ -39,7 +40,7 @@ function App() {
 
           {/* Navigation Tabs */}
           <nav className="mt-4 flex gap-4">
-            {["dashboard", "downloads", "traces"].map((tab) => (
+            {["dashboard", "downloads", "upload", "traces"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as typeof activeTab)}
@@ -81,6 +82,12 @@ function App() {
           <div className="space-y-6">
             <DownloadTester />
             <DownloadJobs />
+          </div>
+        )}
+
+        {activeTab === "upload" && (
+          <div className="space-y-6">
+            <FileUpload />
           </div>
         )}
 
