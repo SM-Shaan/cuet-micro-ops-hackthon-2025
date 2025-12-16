@@ -40,12 +40,12 @@ The project includes automated test scripts for quick verification and comprehen
 
 ### Available npm Scripts
 
-| Script | Command | Description | Duration |
-|--------|---------|-------------|----------|
-| **Full E2E** | `npm run test:e2e` | Starts server and runs all tests | ~30s |
-| **E2E Only** | `npm run test:e2e:only` | Tests only (server must be running) | ~25s |
-| **Quick Test** | `npm run test:quick` | Basic health verification | ~5s |
-| **Resilience** | `npm run test:resilience` | Redis/S3 failure tests | ~2min |
+| Script         | Command                   | Description                         | Duration |
+| -------------- | ------------------------- | ----------------------------------- | -------- |
+| **Full E2E**   | `npm run test:e2e`        | Starts server and runs all tests    | ~30s     |
+| **E2E Only**   | `npm run test:e2e:only`   | Tests only (server must be running) | ~25s     |
+| **Quick Test** | `npm run test:quick`      | Basic health verification           | ~5s      |
+| **Resilience** | `npm run test:resilience` | Redis/S3 failure tests              | ~2min    |
 
 ### Running Tests
 
@@ -65,6 +65,7 @@ npm run test:resilience
 #### 1. E2E Test Script (`scripts/e2e-test.js`)
 
 Tests 45 scenarios including:
+
 - Root and health endpoints
 - Security headers (CORS, rate limiting, etc.)
 - Download initiate/check/start/status endpoints
@@ -81,6 +82,7 @@ node scripts/e2e-test.js [BASE_URL]
 #### 2. Quick Test Script (`scripts/quick-test.sh`)
 
 Fast verification of core functionality:
+
 - Health endpoint with Redis/S3 status
 - Root endpoint response
 - File list endpoint
@@ -94,6 +96,7 @@ bash scripts/quick-test.sh [BASE_URL]
 #### 3. Resilience Test Script (`scripts/resilience-test.sh`)
 
 Tests failure scenarios:
+
 - Redis failure → 503 response → recovery
 - S3 failure → circuit breaker → recovery
 
@@ -125,6 +128,7 @@ docker compose -f docker/compose.dev.yml ps
 ```
 
 **Expected output:** All 5 services should be running:
+
 - `delineate-app` (Backend API) - Port 3000
 - `delineate-dashboard` (Frontend) - Port 5173
 - `delineate-jaeger` (Tracing) - Port 16686
@@ -133,13 +137,13 @@ docker compose -f docker/compose.dev.yml ps
 
 ### Service URLs
 
-| Service | URL |
-|---------|-----|
-| Backend API | http://localhost:3000 |
-| Frontend Dashboard | http://localhost:5173 |
-| API Documentation | http://localhost:3000/docs |
-| Jaeger UI | http://localhost:16686 |
-| RustFS Console | http://localhost:9001 |
+| Service            | URL                        |
+| ------------------ | -------------------------- |
+| Backend API        | http://localhost:3000      |
+| Frontend Dashboard | http://localhost:5173      |
+| API Documentation  | http://localhost:3000/docs |
+| Jaeger UI          | http://localhost:16686     |
+| RustFS Console     | http://localhost:9001      |
 
 ---
 
@@ -152,6 +156,7 @@ curl http://localhost:3000/health
 ```
 
 **Expected response (healthy):**
+
 ```json
 {
   "status": "healthy",
@@ -163,11 +168,13 @@ curl http://localhost:3000/health
 ```
 
 **Possible storage values:**
+
 - `ok` - S3 is accessible
 - `error` - S3 connection failed
 - `circuit_open` - Circuit breaker is open (S3 unavailable)
 
 **Possible redis values:**
+
 - `ok` - Redis is connected
 - `error` - Redis is disconnected
 
@@ -178,8 +185,9 @@ curl http://localhost:3000/
 ```
 
 **Expected response:**
+
 ```json
-{"message":"Hello Hono!"}
+{ "message": "Hello Hono!" }
 ```
 
 ### Test 3: API Documentation
@@ -203,6 +211,7 @@ curl -X POST http://localhost:3000/v1/upload \
 ```
 
 **Expected response:**
+
 ```json
 {
   "success": true,
@@ -220,6 +229,7 @@ curl http://localhost:3000/v1/files
 ```
 
 **Expected response:**
+
 ```json
 {
   "files": [
@@ -243,6 +253,7 @@ curl -X POST http://localhost:3000/v1/download/check \
 ```
 
 **Expected response:**
+
 ```json
 {
   "file_id": 50000,
@@ -263,6 +274,7 @@ curl -I http://localhost:3000/v1/download/file/50000
 ```
 
 **Expected headers:**
+
 ```
 Content-Type: text/plain
 Content-Disposition: attachment; filename="testfile.txt"
@@ -282,6 +294,7 @@ curl -X POST http://localhost:3000/v1/download/start \
 ```
 
 **Expected response:**
+
 ```json
 {
   "jobId": "uuid-here",
@@ -312,6 +325,7 @@ done
 ```
 
 **Status progression:**
+
 1. `queued` (0%) - Job accepted
 2. `processing` (1-99%) - Job in progress
 3. `completed` (100%) - Download ready
@@ -323,11 +337,11 @@ The download system is idempotent using `user_id` as the key. Same `user_id` ret
 
 #### Idempotency Behavior
 
-| Scenario | Result |
-|----------|--------|
-| Same `user_id` with job in `queued` or `processing` | Returns existing job |
-| Same `user_id` after job `completed` or `failed` | Creates new job (allows retry) |
-| Different `user_id` | Creates new job |
+| Scenario                                            | Result                         |
+| --------------------------------------------------- | ------------------------------ |
+| Same `user_id` with job in `queued` or `processing` | Returns existing job           |
+| Same `user_id` after job `completed` or `failed`    | Creates new job (allows retry) |
+| Different `user_id`                                 | Creates new job                |
 
 #### Test: Rapid Requests (Same User)
 
@@ -352,6 +366,7 @@ Request 2:
 ```
 
 **Key Points:**
+
 - Both responses have the **same `jobId`**
 - Request 2 message says "Download job already in progress"
 - Request 2 status may be `processing` (job started between requests)
@@ -363,6 +378,7 @@ docker logs delineate-delineate-app-1 2>&1 | grep -E "(Created new job|Returning
 ```
 
 **Expected log messages:**
+
 ```
 [Download] Created new job userId=idempotent-user jobId=ad2d2e4b-...
 [Download] Returning existing job for userId=idempotent-user jobId=ad2d2e4b-... status=processing
@@ -403,6 +419,7 @@ curl http://localhost:3000/health
 ```
 
 **Expected response:**
+
 ```json
 {
   "status": "unhealthy",
@@ -422,6 +439,7 @@ curl -X POST http://localhost:3000/v1/download/start \
 ```
 
 **Expected response (503 Service Unavailable):**
+
 ```json
 {
   "error": "Service Unavailable",
@@ -431,6 +449,7 @@ curl -X POST http://localhost:3000/v1/download/start \
 ```
 
 **Verify HTTP status code:**
+
 ```bash
 curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:3000/v1/download/start \
   -H "Content-Type: application/json" \
@@ -468,6 +487,7 @@ curl http://localhost:3000/health
 ```
 
 **Expected response:**
+
 ```json
 {
   "status": "unhealthy",
@@ -485,6 +505,7 @@ time curl http://localhost:3000/v1/files
 ```
 
 **Expected response:**
+
 ```json
 {
   "error": "List Failed",
@@ -516,6 +537,7 @@ docker compose -f docker/compose.dev.yml logs delineate-app --tail=50 | grep "Ci
 ```
 
 **Expected log messages:**
+
 ```
 [S3 Circuit Breaker] OPEN - S3 requests will fail fast
 ```
@@ -595,6 +617,7 @@ time curl -o downloaded.bin http://localhost:3000/v1/download/file/88888
 ### Test 15: Distributed Tracing (Jaeger)
 
 1. Make some API requests:
+
    ```bash
    curl http://localhost:3000/health
    curl http://localhost:3000/v1/files
@@ -693,6 +716,7 @@ curl -s http://localhost:3000/health
 ```
 
 **Success Criteria:**
+
 - All steps return expected responses
 - Job completes with status "completed"
 - File downloads with correct content
@@ -802,21 +826,21 @@ curl -s http://localhost:3000/health
 
 ## Quick Verification Checklist
 
-| Test | Command | Expected |
-|------|---------|----------|
-| Health | `curl localhost:3000/health` | `status: healthy` |
-| Redis OK | `curl localhost:3000/health` | `redis: ok` |
-| Storage OK | `curl localhost:3000/health` | `storage: ok` |
-| Upload | `curl -F file=@test.txt -F file_id=50000 localhost:3000/v1/upload` | `success: true` |
-| List Files | `curl localhost:3000/v1/files` | Array of files |
-| Start Job | `curl -X POST -d '{"file_id":50000,"user_id":"x"}' localhost:3000/v1/download/start` | `status: queued` |
-| Poll Status | `curl localhost:3000/v1/download/status/x` | Progress updates |
-| Download | `curl -O -J localhost:3000/v1/download/file/50000` | File downloads |
-| Idempotency | Two rapid requests with same `user_id` | Same `jobId` returned |
-| Redis Down | Stop redis, start job | `503 Service Unavailable` |
-| S3 Down | Stop rustfs, list files | `5s timeout` (not 11s) |
-| Circuit Open | Health after S3 down | `storage: circuit_open` |
-| E2E Upload→Download | Upload file, start job, poll, download | Full cycle works |
+| Test                | Command                                                                              | Expected                  |
+| ------------------- | ------------------------------------------------------------------------------------ | ------------------------- |
+| Health              | `curl localhost:3000/health`                                                         | `status: healthy`         |
+| Redis OK            | `curl localhost:3000/health`                                                         | `redis: ok`               |
+| Storage OK          | `curl localhost:3000/health`                                                         | `storage: ok`             |
+| Upload              | `curl -F file=@test.txt -F file_id=50000 localhost:3000/v1/upload`                   | `success: true`           |
+| List Files          | `curl localhost:3000/v1/files`                                                       | Array of files            |
+| Start Job           | `curl -X POST -d '{"file_id":50000,"user_id":"x"}' localhost:3000/v1/download/start` | `status: queued`          |
+| Poll Status         | `curl localhost:3000/v1/download/status/x`                                           | Progress updates          |
+| Download            | `curl -O -J localhost:3000/v1/download/file/50000`                                   | File downloads            |
+| Idempotency         | Two rapid requests with same `user_id`                                               | Same `jobId` returned     |
+| Redis Down          | Stop redis, start job                                                                | `503 Service Unavailable` |
+| S3 Down             | Stop rustfs, list files                                                              | `5s timeout` (not 11s)    |
+| Circuit Open        | Health after S3 down                                                                 | `storage: circuit_open`   |
+| E2E Upload→Download | Upload file, start job, poll, download                                               | Full cycle works          |
 
 ---
 

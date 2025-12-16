@@ -84,12 +84,12 @@ User's Browser
 
 Timeouts aren't arbitrary - they protect systems:
 
-| Resource | Without Timeout | With Timeout |
-|----------|----------------|--------------|
-| **Memory** | Each waiting connection holds RAM | Freed after timeout |
-| **Connections** | Server runs out of sockets | New users can connect |
-| **CPU** | Stuck threads consume CPU | Resources recycled |
-| **Cost** | Cloud bills skyrocket | Predictable costs |
+| Resource        | Without Timeout                   | With Timeout          |
+| --------------- | --------------------------------- | --------------------- |
+| **Memory**      | Each waiting connection holds RAM | Freed after timeout   |
+| **Connections** | Server runs out of sockets        | New users can connect |
+| **CPU**         | Stuck threads consume CPU         | Resources recycled    |
+| **Cost**        | Cloud bills skyrocket             | Predictable costs     |
 
 ### The Math Behind It
 
@@ -143,12 +143,14 @@ With timeout:
 ```
 
 **Pros:**
+
 - Works through ANY proxy (all requests are short)
 - Simple to implement
 - Easy to debug
 - No special infrastructure needed
 
 **Cons:**
+
 - Wastes bandwidth (many "nothing changed" responses)
 - Slight delay detecting completion (up to poll interval)
 
@@ -185,19 +187,21 @@ With timeout:
 
 **SSE vs WebSocket:**
 
-| Feature | SSE | WebSocket |
-|---------|-----|-----------|
-| Direction | Server → Client only | Bidirectional |
-| Complexity | Simple | Complex |
-| Reconnection | Automatic | Manual |
-| Protocol | HTTP | WS:// |
-| Proxy Support | Good | Variable |
+| Feature       | SSE                  | WebSocket     |
+| ------------- | -------------------- | ------------- |
+| Direction     | Server → Client only | Bidirectional |
+| Complexity    | Simple               | Complex       |
+| Reconnection  | Automatic            | Manual        |
+| Protocol      | HTTP                 | WS://         |
+| Proxy Support | Good                 | Variable      |
 
 **Pros:**
+
 - Instant updates (no delay)
 - Efficient (no wasted requests)
 
 **Cons:**
+
 - Some proxies don't support long connections
 - Connection management complexity
 - Needs reconnection logic
@@ -231,10 +235,12 @@ With timeout:
 ```
 
 **Best for:**
+
 - Server-to-server communication
 - Backend integrations
 
 **Not ideal for:**
+
 - Browser clients (can't receive webhooks)
 - Mobile apps (complex callback handling)
 
@@ -271,6 +277,7 @@ With timeout:
 ```
 
 **Why this could be best:**
+
 1. Best experience when possible (SSE = instant updates)
 2. Always works (polling = universal fallback)
 3. Graceful degradation
@@ -281,14 +288,14 @@ With timeout:
 
 ### Decision Matrix
 
-| Criteria | Polling | WebSocket | Webhook | Hybrid |
-|----------|---------|-----------|---------|--------|
-| Complexity | Low | High | Medium | High |
-| Works through proxies | Always | Often blocked | N/A | Usually |
-| Browser support | 100% | 95% | N/A | 95% |
-| Scaling | Stateless | Sticky sessions | Stateless | Mixed |
-| Debug/Monitor | Easy | Hard | Medium | Hard |
-| Implementation time | 1-2 days | 3-5 days | 2-3 days | 5-7 days |
+| Criteria              | Polling   | WebSocket       | Webhook   | Hybrid   |
+| --------------------- | --------- | --------------- | --------- | -------- |
+| Complexity            | Low       | High            | Medium    | High     |
+| Works through proxies | Always    | Often blocked   | N/A       | Usually  |
+| Browser support       | 100%      | 95%             | N/A       | 95%      |
+| Scaling               | Stateless | Sticky sessions | Stateless | Mixed    |
+| Debug/Monitor         | Easy      | Hard            | Medium    | Hard     |
+| Implementation time   | 1-2 days  | 3-5 days        | 2-3 days  | 5-7 days |
 
 ### The 80/20 Rule
 
@@ -341,6 +348,7 @@ vs WebSocket which requires:
 ### Final Verdict
 
 **Only consider WebSocket/SSE if:**
+
 - You need sub-second real-time updates
 - You're building a highly interactive dashboard
 - Users will be staring at progress bars for 2+ minutes
@@ -380,6 +388,7 @@ vs WebSocket which requires:
 ```
 
 **How we implement it:**
+
 - Use `userId` as the Redis key: `download:{userId}`
 - Before creating a new job, check if one already exists
 - If active job exists (queued/processing), return it instead of creating new
@@ -413,6 +422,7 @@ vs WebSocket which requires:
 ```
 
 **Why use a queue?**
+
 - **Decoupling**: API and processing are separate
 - **Scaling**: Add more workers for more capacity
 - **Reliability**: Jobs persist even if server restarts
@@ -464,6 +474,7 @@ vs WebSocket which requires:
 ```
 
 **Our implementation:**
+
 - Uses `opossum` library
 - 5-second timeout per request
 - Opens circuit after 50% failure rate
@@ -543,6 +554,7 @@ vs WebSocket which requires:
 ```
 
 **Why we didn't implement SSE:**
+
 - Polling is simpler and works everywhere
 - Current scale doesn't require real-time updates
 - SSE adds connection management complexity
@@ -553,28 +565,28 @@ vs WebSocket which requires:
 
 ### The Restaurant Analogy (Complete)
 
-| Your System | Restaurant |
-|-------------|------------|
-| API Server | Waiter |
-| Job Queue | Kitchen ticket system |
-| Worker | Chef |
-| Redis | Kitchen display showing order status |
-| SSE | Buzzer that vibrates when food is ready |
-| Polling | Walking to counter asking "is it ready?" |
-| Presigned URL | Receipt to pick up your order |
-| Timeout | Kitchen closes at 10 PM |
-| Circuit Breaker | "Sorry, grill is broken, no steaks today" |
-| Idempotency | "You already ordered that, here's your ticket" |
+| Your System     | Restaurant                                     |
+| --------------- | ---------------------------------------------- |
+| API Server      | Waiter                                         |
+| Job Queue       | Kitchen ticket system                          |
+| Worker          | Chef                                           |
+| Redis           | Kitchen display showing order status           |
+| SSE             | Buzzer that vibrates when food is ready        |
+| Polling         | Walking to counter asking "is it ready?"       |
+| Presigned URL   | Receipt to pick up your order                  |
+| Timeout         | Kitchen closes at 10 PM                        |
+| Circuit Breaker | "Sorry, grill is broken, no steaks today"      |
+| Idempotency     | "You already ordered that, here's your ticket" |
 
 ### The Amazon Delivery Analogy
 
-| Your System | Amazon |
-|-------------|--------|
-| POST /initiate | Place order |
-| jobId | Order confirmation number |
-| GET /status | Track package |
-| SSE updates | Push notifications |
-| Presigned URL | Locker code |
+| Your System       | Amazon                      |
+| ----------------- | --------------------------- |
+| POST /initiate    | Place order                 |
+| jobId             | Order confirmation number   |
+| GET /status       | Track package               |
+| SSE updates       | Push notifications          |
+| Presigned URL     | Locker code                 |
 | Worker processing | Warehouse picking & packing |
 
 ---
@@ -671,12 +683,12 @@ vs WebSocket which requires:
 
 ### When to Consider More Complexity
 
-| If you need... | Consider... |
-|----------------|-------------|
-| Sub-second updates | SSE or WebSocket |
+| If you need...                   | Consider...               |
+| -------------------------------- | ------------------------- |
+| Sub-second updates               | SSE or WebSocket          |
 | Massive scale (1000+ concurrent) | BullMQ + multiple workers |
-| Direct S3 downloads | Presigned URLs |
-| Server-to-server callbacks | Webhooks |
-| High availability | Redis Sentinel/Cluster |
+| Direct S3 downloads              | Presigned URLs            |
+| Server-to-server callbacks       | Webhooks                  |
+| High availability                | Redis Sentinel/Cluster    |
 
 For this hackathon project, **polling with Redis provides the right balance** of simplicity and functionality.

@@ -119,7 +119,9 @@ export function FileUpload() {
     <div className="space-y-6">
       {/* Upload Form */}
       <div className="card">
-        <h2 className="text-xl font-semibold text-slate-900 mb-4">Upload File to S3</h2>
+        <h2 className="text-xl font-semibold text-slate-900 mb-4">
+          Upload File to S3
+        </h2>
 
         <form onSubmit={handleUpload} className="space-y-4">
           <div>
@@ -186,17 +188,15 @@ export function FileUpload() {
             )}
           </div>
         )}
-        {success && (
-          <div className="alert-success mt-4">
-            {success}
-          </div>
-        )}
+        {success && <div className="alert-success mt-4">{success}</div>}
       </div>
 
       {/* File List */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-slate-900">Files in S3 Bucket</h2>
+          <h2 className="text-xl font-semibold text-slate-900">
+            Files in S3 Bucket
+          </h2>
           <button
             onClick={fetchFiles}
             disabled={loading}
@@ -207,7 +207,9 @@ export function FileUpload() {
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-slate-400">Loading files...</div>
+          <div className="text-center py-8 text-slate-400">
+            Loading files...
+          </div>
         ) : files.length === 0 ? (
           <div className="text-center py-8 text-slate-400">
             No files in bucket. Upload a file to get started!

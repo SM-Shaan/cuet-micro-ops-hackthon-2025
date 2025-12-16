@@ -214,7 +214,9 @@ export function DownloadTester() {
 
   return (
     <div className="card">
-      <h2 className="text-lg font-semibold text-slate-900 mb-4">Download Tester</h2>
+      <h2 className="text-lg font-semibold text-slate-900 mb-4">
+        Download Tester
+      </h2>
 
       <div className="space-y-4">
         {/* File ID Input */}
@@ -281,7 +283,9 @@ export function DownloadTester() {
         {currentJob && (
           <div className="bg-slate-50 rounded-lg p-4 space-y-3 border border-slate-200">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-500">Current Job</span>
+              <span className="text-sm font-medium text-slate-500">
+                Current Job
+              </span>
               <span className={`status-badge status-${currentJob.status}`}>
                 {currentJob.status}
               </span>

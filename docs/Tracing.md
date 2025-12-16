@@ -40,6 +40,7 @@ Distributed tracing allows you to track requests as they flow through your syste
 **Service Name:** `delineate-dashboard`
 
 **Key Features:**
+
 - Automatic fetch instrumentation (traces all API calls)
 - Trace context propagation via `traceparent` header
 - Session storage of current trace ID for Sentry correlation
@@ -69,6 +70,7 @@ const result = await createSpan('download-start', async () => {
 **Service Name:** `delineate-hackathon-challenge`
 
 **Key Features:**
+
 - Automatic HTTP instrumentation
 - Automatic fetch instrumentation
 - Redis instrumentation
@@ -80,9 +82,11 @@ const result = await createSpan('download-start', async () => {
 import { Sentry, shutdownOtel } from "./instrument.js";
 
 // Middleware for HTTP instrumentation
-app.use(httpInstrumentationMiddleware({
-  serviceName: "delineate-hackathon-challenge",
-}));
+app.use(
+  httpInstrumentationMiddleware({
+    serviceName: "delineate-hackathon-challenge",
+  }),
+);
 ```
 
 ### 3. Jaeger (Trace Collector)
@@ -90,10 +94,12 @@ app.use(httpInstrumentationMiddleware({
 **Image:** `jaegertracing/all-in-one:latest`
 
 **Ports:**
+
 - `16686` - Jaeger UI (web interface)
 - `4318` - OTLP HTTP receiver (for traces)
 
 **Environment Variables:**
+
 ```yaml
 environment:
   - COLLECTOR_OTLP_ENABLED=true
@@ -106,24 +112,28 @@ environment:
 ### How Traces Flow
 
 1. **Frontend creates a trace:**
+
    ```
    Browser starts span "download-start"
    Trace ID: abc123def456...
    ```
 
 2. **Frontend sends request with trace context:**
+
    ```http
    POST /api/v1/download/start
    traceparent: 00-abc123def456...-789xyz...-01
    ```
 
 3. **Backend extracts trace context:**
+
    ```
    Backend receives traceparent header
    Creates child span under same Trace ID
    ```
 
 4. **Backend makes downstream calls:**
+
    ```
    S3 operations, Redis operations
    All linked to same Trace ID
@@ -152,14 +162,14 @@ Example: `00-8ee93ab4bb162c407848389b8810da96-c17f33ff15a29d9c-01`
 
 #### Frontend (Build-time)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
+| Variable                           | Description          | Example                 |
+| ---------------------------------- | -------------------- | ----------------------- |
 | `VITE_OTEL_EXPORTER_OTLP_ENDPOINT` | Jaeger OTLP endpoint | `http://localhost:4318` |
 
 #### Backend (Runtime)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
+| Variable                      | Description          | Example                        |
+| ----------------------------- | -------------------- | ------------------------------ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Jaeger OTLP endpoint | `http://delineate-jaeger:4318` |
 
 ### Docker Compose Configuration
@@ -180,8 +190,8 @@ delineate-dashboard:
 delineate-jaeger:
   image: jaegertracing/all-in-one:latest
   ports:
-    - "16686:16686"  # UI
-    - "4318:4318"    # OTLP HTTP
+    - "16686:16686" # UI
+    - "4318:4318" # OTLP HTTP
   environment:
     - COLLECTOR_OTLP_ENABLED=true
     - COLLECTOR_OTLP_HTTP_CORS_ALLOWED_ORIGINS=*
@@ -216,6 +226,7 @@ Trace: 8ee93ab4bb162c407848389b8810da96
 ```
 
 Each span shows:
+
 - **Service name** - Which service executed the span
 - **Operation name** - What operation was performed
 - **Duration** - How long it took
@@ -240,7 +251,7 @@ Traces are correlated with Sentry errors for debugging:
 
 ```javascript
 // Frontend: lib/sentry.ts
-Sentry.setTag('trace_id', getCurrentTraceId());
+Sentry.setTag("trace_id", getCurrentTraceId());
 
 // When an error occurs, Sentry captures:
 // - Error details
@@ -249,6 +260,7 @@ Sentry.setTag('trace_id', getCurrentTraceId());
 ```
 
 This allows you to:
+
 1. See an error in Sentry
 2. Get the trace ID from the error tags
 3. Look up the full trace in Jaeger
@@ -259,10 +271,13 @@ This allows you to:
 ### Frontend traces not appearing
 
 1. **Check browser console** for:
+
    ```
    OpenTelemetry tracing initialized
    ```
+
    If you see "OTEL endpoint not configured", rebuild the frontend:
+
    ```bash
    docker compose -f docker/compose.dev.yml up -d --build delineate-dashboard
    ```
@@ -280,12 +295,15 @@ This allows you to:
 ### Backend traces not appearing
 
 1. **Check backend logs**:
+
    ```bash
    docker compose -f docker/compose.dev.yml logs delineate-app | grep OTEL
    ```
+
    Should show: `[OTEL] Tracing enabled: http://delineate-jaeger:4318`
 
 2. **Verify Jaeger is running**:
+
    ```bash
    curl http://localhost:16686/api/services
    ```
@@ -299,11 +317,13 @@ This allows you to:
 ### Jaeger not receiving traces
 
 1. **Check Jaeger logs**:
+
    ```bash
    docker compose -f docker/compose.dev.yml logs delineate-jaeger
    ```
 
 2. **Verify OTLP endpoint is accessible**:
+
    ```bash
    curl -v http://localhost:4318/v1/traces
    ```
@@ -316,25 +336,28 @@ This allows you to:
 ## Best Practices
 
 1. **Use meaningful span names**:
+
    ```javascript
    createSpan('download-file', ...) // Good
    createSpan('operation1', ...)    // Bad
    ```
 
 2. **Add relevant attributes**:
+
    ```javascript
-   createSpan('download', fn, {
-     'file.id': fileId,
-     'user.id': userId,
-     'file.size': size,
+   createSpan("download", fn, {
+     "file.id": fileId,
+     "user.id": userId,
+     "file.size": size,
    });
    ```
 
 3. **Propagate context** in async operations:
+
    ```javascript
    // Context is automatically propagated within createSpan callback
-   await createSpan('parent', async () => {
-     await createSpan('child', async () => {
+   await createSpan("parent", async () => {
+     await createSpan("child", async () => {
        // This span is correctly parented
      });
    });
@@ -347,11 +370,11 @@ This allows you to:
 
 ## Files Reference
 
-| File | Description |
-|------|-------------|
-| `frontend/src/lib/tracing.ts` | Frontend OpenTelemetry setup |
-| `frontend/src/main.tsx` | Calls `initTracing()` |
-| `src/instrument.js` | Backend OpenTelemetry setup |
-| `src/index.js` | Uses `httpInstrumentationMiddleware` |
-| `docker/compose.dev.yml` | Jaeger and env var configuration |
-| `frontend/Dockerfile` | Build args for VITE_OTEL_* |
+| File                          | Description                          |
+| ----------------------------- | ------------------------------------ |
+| `frontend/src/lib/tracing.ts` | Frontend OpenTelemetry setup         |
+| `frontend/src/main.tsx`       | Calls `initTracing()`                |
+| `src/instrument.js`           | Backend OpenTelemetry setup          |
+| `src/index.js`                | Uses `httpInstrumentationMiddleware` |
+| `docker/compose.dev.yml`      | Jaeger and env var configuration     |
+| `frontend/Dockerfile`         | Build args for VITE*OTEL*\*          |

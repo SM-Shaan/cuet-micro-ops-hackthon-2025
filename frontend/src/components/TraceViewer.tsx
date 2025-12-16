@@ -15,7 +15,9 @@ export function TraceViewer() {
 
   return (
     <div className="card">
-      <h2 className="text-lg font-semibold text-slate-900 mb-4">Trace Viewer</h2>
+      <h2 className="text-lg font-semibold text-slate-900 mb-4">
+        Trace Viewer
+      </h2>
 
       <div className="space-y-4">
         {/* Jaeger Link */}
@@ -92,7 +94,9 @@ export function TraceViewer() {
             </p>
             <p>
               2. The trace ID is propagated to the backend via the{" "}
-              <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-700">traceparent</code>{" "}
+              <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-700">
+                traceparent
+              </code>{" "}
               header.
             </p>
             <p>
@@ -105,7 +109,9 @@ export function TraceViewer() {
 
           <div className="mt-4 p-3 bg-slate-800 rounded-lg font-mono text-xs">
             <div className="text-slate-400">// Example trace correlation</div>
-            <div className="text-emerald-400">Frontend span: trace_id=abc123</div>
+            <div className="text-emerald-400">
+              Frontend span: trace_id=abc123
+            </div>
             <div className="text-blue-400">
               API request: traceparent: 00-abc123-...
             </div>

@@ -18,25 +18,25 @@ This document outlines potential improvements and production-ready features that
 
 ### What's Implemented ✅
 
-| Feature | Implementation | Status |
-|---------|---------------|--------|
-| Async Download Pattern | Polling with Redis | ✅ Complete |
-| Job Storage | Redis with TTL | ✅ Complete |
-| Circuit Breaker | Opossum (5s timeout, 30s reset) | ✅ Complete |
-| Redis Failure Handling | 503 responses | ✅ Complete |
-| Health Dashboard | Real-time status display | ✅ Complete |
-| File Upload/Download | S3 streaming | ✅ Complete |
-| E2E Testing | 45 automated tests | ✅ Complete |
+| Feature                | Implementation                  | Status      |
+| ---------------------- | ------------------------------- | ----------- |
+| Async Download Pattern | Polling with Redis              | ✅ Complete |
+| Job Storage            | Redis with TTL                  | ✅ Complete |
+| Circuit Breaker        | Opossum (5s timeout, 30s reset) | ✅ Complete |
+| Redis Failure Handling | 503 responses                   | ✅ Complete |
+| Health Dashboard       | Real-time status display        | ✅ Complete |
+| File Upload/Download   | S3 streaming                    | ✅ Complete |
+| E2E Testing            | 45 automated tests              | ✅ Complete |
 
 ### What's Not Implemented
 
-| Feature | Reason | Priority |
-|---------|--------|----------|
-| Server-Sent Events (SSE) | Polling sufficient for demo | Medium |
-| BullMQ Job Queue | In-memory processing works | High |
-| Presigned URLs | Direct streaming works | Medium |
-| Horizontal Scaling | Single instance sufficient | Low |
-| Database Persistence | Redis TTL sufficient | Medium |
+| Feature                  | Reason                      | Priority |
+| ------------------------ | --------------------------- | -------- |
+| Server-Sent Events (SSE) | Polling sufficient for demo | Medium   |
+| BullMQ Job Queue         | In-memory processing works  | High     |
+| Presigned URLs           | Direct streaming works      | Medium   |
+| Horizontal Scaling       | Single instance sufficient  | Low      |
+| Database Persistence     | Redis TTL sufficient        | Medium   |
 
 ---
 
@@ -50,8 +50,8 @@ This document outlines potential improvements and production-ready features that
 
 ```javascript
 // Backend: SSE endpoint
-app.get('/v1/download/events/:userId', async (c) => {
-  const userId = c.req.param('userId');
+app.get("/v1/download/events/:userId", async (c) => {
+  const userId = c.req.param("userId");
 
   return streamSSE(c, async (stream) => {
     while (true) {
@@ -59,11 +59,11 @@ app.get('/v1/download/events/:userId', async (c) => {
       if (!job) break;
 
       await stream.writeSSE({
-        event: 'progress',
-        data: JSON.stringify(job)
+        event: "progress",
+        data: JSON.stringify(job),
       });
 
-      if (job.status === 'completed' || job.status === 'failed') {
+      if (job.status === "completed" || job.status === "failed") {
         break;
       }
 
@@ -81,7 +81,7 @@ eventSource.onmessage = (event) => {
   const job = JSON.parse(event.data);
   setProgress(job.progress);
 
-  if (job.status === 'completed') {
+  if (job.status === "completed") {
     eventSource.close();
     window.location.href = job.downloadUrl;
   }
@@ -95,6 +95,7 @@ eventSource.onerror = () => {
 ```
 
 **Benefits:**
+
 - Instant updates (no 2-3s delay)
 - Less server load (no repeated requests)
 - Better UX
@@ -129,6 +130,7 @@ job.downloadUrl = await generatePresignedUrl(job.fileId);
 ```
 
 **Benefits:**
+
 - Reduces server bandwidth
 - Faster downloads (direct from S3 CDN)
 - Better scalability
@@ -152,7 +154,7 @@ const processWithRetry = async (job, maxRetries = 3) => {
       if (attempt === maxRetries) throw error;
 
       const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-      await new Promise(r => setTimeout(r, delay));
+      await new Promise((r) => setTimeout(r, delay));
 
       job.retryCount = attempt;
       await jobStore.set(job.userId, job);
@@ -174,43 +176,52 @@ const processWithRetry = async (job, maxRetries = 3) => {
 **Improvement:** Proper job queue with workers.
 
 ```javascript
-import { Queue, Worker } from 'bullmq';
+import { Queue, Worker } from "bullmq";
 
-const downloadQueue = new Queue('downloads', {
-  connection: { host: 'redis', port: 6379 }
+const downloadQueue = new Queue("downloads", {
+  connection: { host: "redis", port: 6379 },
 });
 
 // Add job
-await downloadQueue.add('process', { fileId, userId }, {
-  attempts: 3,
-  backoff: { type: 'exponential', delay: 2000 },
-  removeOnComplete: { age: 3600 },
-  removeOnFail: { age: 86400 }
-});
+await downloadQueue.add(
+  "process",
+  { fileId, userId },
+  {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 2000 },
+    removeOnComplete: { age: 3600 },
+    removeOnFail: { age: 86400 },
+  },
+);
 
 // Worker
-const worker = new Worker('downloads', async (job) => {
-  const { fileId, userId } = job.data;
+const worker = new Worker(
+  "downloads",
+  async (job) => {
+    const { fileId, userId } = job.data;
 
-  // Update progress
-  await job.updateProgress(50);
+    // Update progress
+    await job.updateProgress(50);
 
-  // Process download
-  const result = await processDownload(fileId);
+    // Process download
+    const result = await processDownload(fileId);
 
-  return result;
-}, { connection: { host: 'redis', port: 6379 } });
+    return result;
+  },
+  { connection: { host: "redis", port: 6379 } },
+);
 
 // Listen for completion
-worker.on('completed', async (job, result) => {
+worker.on("completed", async (job, result) => {
   await jobStore.set(job.data.userId, {
     ...result,
-    status: 'completed'
+    status: "completed",
   });
 });
 ```
 
 **Benefits:**
+
 - Persistent jobs (survive restarts)
 - Built-in retry logic
 - Rate limiting
@@ -247,6 +258,7 @@ CREATE INDEX idx_jobs_status ON download_jobs(status);
 ```
 
 **Benefits:**
+
 - Job history and analytics
 - Audit trail
 - Survives Redis failures
@@ -268,10 +280,10 @@ const userRateLimiter = rateLimiter({
   windowMs: 60000,
   limit: 10, // 10 downloads per minute per user
   keyGenerator: (c) => c.req.header("X-User-ID") || c.req.ip,
-  store: new RedisStore({ client: redis })
+  store: new RedisStore({ client: redis }),
 });
 
-app.use('/v1/download/*', userRateLimiter);
+app.use("/v1/download/*", userRateLimiter);
 ```
 
 **Effort:** 2 hours
@@ -304,6 +316,7 @@ services:
 ```
 
 **Architecture:**
+
 ```
                     ┌─────────────┐
                     │ Load Balancer│
@@ -344,27 +357,27 @@ spec:
   template:
     spec:
       containers:
-      - name: api
-        image: delineate-api:latest
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 5
+        - name: api
+          image: delineate-api:latest
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -378,12 +391,12 @@ spec:
   minReplicas: 2
   maxReplicas: 10
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
 ```
 
 ---
@@ -393,31 +406,31 @@ spec:
 ```yaml
 # Prometheus alerts
 groups:
-- name: delineate-alerts
-  rules:
-  - alert: HighErrorRate
-    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
-    for: 5m
-    labels:
-      severity: critical
-    annotations:
-      summary: "High error rate detected"
+  - name: delineate-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
 
-  - alert: CircuitBreakerOpen
-    expr: circuit_breaker_state{service="s3"} == 1
-    for: 1m
-    labels:
-      severity: warning
-    annotations:
-      summary: "S3 circuit breaker is open"
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{service="s3"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "S3 circuit breaker is open"
 
-  - alert: RedisDown
-    expr: redis_up == 0
-    for: 30s
-    labels:
-      severity: critical
-    annotations:
-      summary: "Redis is down"
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
 ```
 
 ---
@@ -443,17 +456,17 @@ const r2Client = new S3Client({
 
 ## Implementation Priority Matrix
 
-| Priority | Feature | Effort | Impact | When |
-|----------|---------|--------|--------|------|
-| **P0** | BullMQ Job Queue | 4-6h | High | Before production |
-| **P1** | Presigned URLs | 1-2h | High | Before production |
-| **P1** | SSE Real-Time | 2-3h | Medium | Before production |
-| **P2** | Database Persistence | 4-6h | Medium | Month 1 |
-| **P2** | Per-User Rate Limiting | 2h | Medium | Month 1 |
-| **P3** | Horizontal Scaling | 8h | High | Month 2 |
-| **P3** | Kubernetes | 16h | High | Month 2 |
-| **P4** | CDN Integration | 4h | Medium | Month 3 |
-| **P4** | Advanced Monitoring | 8h | Medium | Month 3 |
+| Priority | Feature                | Effort | Impact | When              |
+| -------- | ---------------------- | ------ | ------ | ----------------- |
+| **P0**   | BullMQ Job Queue       | 4-6h   | High   | Before production |
+| **P1**   | Presigned URLs         | 1-2h   | High   | Before production |
+| **P1**   | SSE Real-Time          | 2-3h   | Medium | Before production |
+| **P2**   | Database Persistence   | 4-6h   | Medium | Month 1           |
+| **P2**   | Per-User Rate Limiting | 2h     | Medium | Month 1           |
+| **P3**   | Horizontal Scaling     | 8h     | High   | Month 2           |
+| **P3**   | Kubernetes             | 16h    | High   | Month 2           |
+| **P4**   | CDN Integration        | 4h     | Medium | Month 3           |
+| **P4**   | Advanced Monitoring    | 8h     | Medium | Month 3           |
 
 ---
 
@@ -472,6 +485,7 @@ const r2Client = new S3Client({
 The current implementation is **complete for hackathon purposes**. The polling pattern with Redis job storage, circuit breaker, and health monitoring provides a solid foundation.
 
 For production deployment, prioritize:
+
 1. **BullMQ** for reliable job processing
 2. **Presigned URLs** for scalable downloads
 3. **SSE** for better user experience

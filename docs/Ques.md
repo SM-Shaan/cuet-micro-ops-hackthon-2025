@@ -10,7 +10,7 @@
 10. Demonstrate the rustfs walkthrough
 11. what is ttl?
 12. How to Sentry detect errors?
-2. How to integrate Sentry in codebase?
-3. What is role of CODEOWNER? Is the error that is catched in sentry dashboard is generated as an issue in git repo?
-4. What is the importance of add github integartions in Sentry? 
-5. How to add tracing & Alerting in Sentry? 
+13. How to integrate Sentry in codebase?
+14. What is role of CODEOWNER? Is the error that is catched in sentry dashboard is generated as an issue in git repo?
+15. What is the importance of add github integartions in Sentry?
+16. How to add tracing & Alerting in Sentry?

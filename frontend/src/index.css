@@ -8,7 +8,14 @@
   font-weight: 400;
   color-scheme: light;
   color: #1e293b;
-  background: linear-gradient(135deg, #f0f9ff 0%, #fdf2f8 25%, #f0fdf4 50%, #fffbeb 75%, #f5f3ff 100%);
+  background: linear-gradient(
+    135deg,
+    #f0f9ff 0%,
+    #fdf2f8 25%,
+    #f0fdf4 50%,
+    #fffbeb 75%,
+    #f5f3ff 100%
+  );
   background-attachment: fixed;
   min-height: 100vh;
 }
@@ -193,7 +200,8 @@ body {
   }
 
   @keyframes pulse-green {
-    0%, 100% {
+    0%,
+    100% {
       box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
     }
     50% {
@@ -202,7 +210,8 @@ body {
   }
 
   @keyframes pulse-red {
-    0%, 100% {
+    0%,
+    100% {
       box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
     }
     50% {
@@ -261,7 +270,8 @@ body {
   }
 
   @keyframes blob {
-    0%, 100% {
+    0%,
+    100% {
       transform: translate(0, 0) scale(1);
     }
     25% {
@@ -293,7 +303,8 @@ body {
 
   /* Floating animation */
   @keyframes float {
-    0%, 100% {
+    0%,
+    100% {
       transform: translateY(0px);
     }
     50% {
@@ -348,10 +359,18 @@ body {
   }
 
   .rainbow-border::before {
-    content: '';
+    content: "";
     position: absolute;
     inset: -2px;
-    background: linear-gradient(90deg, #f472b6, #818cf8, #38bdf8, #34d399, #fbbf24, #f472b6);
+    background: linear-gradient(
+      90deg,
+      #f472b6,
+      #818cf8,
+      #38bdf8,
+      #34d399,
+      #fbbf24,
+      #f472b6
+    );
     background-size: 200% 100%;
     animation: rainbow 4s linear infinite;
     z-index: -1;

@@ -118,7 +118,9 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
                     {job.id.slice(0, 8)}
                   </span>
                   <span className="text-slate-300">|</span>
-                  <span className="text-sm text-slate-600">File: {job.fileId}</span>
+                  <span className="text-sm text-slate-600">
+                    File: {job.fileId}
+                  </span>
                 </div>
                 <span className={`status-badge status-${job.status}`}>
                   {job.status}

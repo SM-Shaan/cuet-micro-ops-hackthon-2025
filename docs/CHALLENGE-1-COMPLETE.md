@@ -18,11 +18,11 @@
 
 ## Challenge Overview
 
-| Attribute | Value |
-|-----------|-------|
-| **Challenge** | Self-Hosted S3 Storage Integration |
-| **Max Points** | 15 |
-| **Difficulty** | Medium |
+| Attribute      | Value                              |
+| -------------- | ---------------------------------- |
+| **Challenge**  | Self-Hosted S3 Storage Integration |
+| **Max Points** | 15                                 |
+| **Difficulty** | Medium                             |
 
 ### Mission
 
@@ -51,12 +51,12 @@ Integrate a self-hosted S3-compatible storage service with the Docker configurat
 
 ### Real-World Importance
 
-| Requirement | Why It Matters |
-|-------------|----------------|
-| **S3 Storage** | Store files, assets, backups - every app needs persistent storage |
-| **Health Checks** | Kubernetes/load balancers use these to route traffic |
-| **Auto-initialization** | Zero manual setup = reliable deployments |
-| **Docker networking** | Microservices must communicate securely |
+| Requirement             | Why It Matters                                                    |
+| ----------------------- | ----------------------------------------------------------------- |
+| **S3 Storage**          | Store files, assets, backups - every app needs persistent storage |
+| **Health Checks**       | Kubernetes/load balancers use these to route traffic              |
+| **Auto-initialization** | Zero manual setup = reliable deployments                          |
+| **Docker networking**   | Microservices must communicate securely                           |
 
 ---
 
@@ -69,6 +69,7 @@ Integrate a self-hosted S3-compatible storage service with the Docker configurat
 **Problem:** The original Docker Compose configuration lacked any S3-compatible storage service.
 
 **Original `compose.dev.yml`:**
+
 ```yaml
 services:
   delineate-app:
@@ -88,6 +89,7 @@ services:
 ```
 
 **Impact:**
+
 - Health endpoint returns `{"status": "unhealthy", "checks": {"storage": "error"}}`
 - File download operations fail
 - E2E tests fail
@@ -95,6 +97,7 @@ services:
 #### Issue 2: Missing S3 Environment Variables
 
 **Problem:** Required environment variables not configured:
+
 - `S3_ENDPOINT` - Storage service URL
 - `S3_ACCESS_KEY_ID` - Access credentials
 - `S3_SECRET_ACCESS_KEY` - Secret credentials
@@ -143,7 +146,7 @@ const checkS3Health = async () => {
     return true;
   } catch (err) {
     if (err instanceof Error && err.name === "NotFound") return true;
-    return false;  // <-- We're hitting this!
+    return false; // <-- We're hitting this!
   }
 };
 ```
@@ -215,21 +218,21 @@ const checkS3Health = async () => {
 
 ### Decision 1: Which S3-Compatible Storage?
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **RustFS** | Lightweight, fast, simple | Newer, less documentation |
-| **MinIO** | Battle-tested, feature-rich | Heavier, more complex |
-| **LocalStack** | Full AWS emulation | Overkill for just S3 |
+| Option         | Pros                        | Cons                      |
+| -------------- | --------------------------- | ------------------------- |
+| **RustFS**     | Lightweight, fast, simple   | Newer, less documentation |
+| **MinIO**      | Battle-tested, feature-rich | Heavier, more complex     |
+| **LocalStack** | Full AWS emulation          | Overkill for just S3      |
 
 **Decision: RustFS** - Lightweight and recommended by the challenge.
 
 ### Decision 2: How to Create Bucket Automatically?
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **Init container** | Clean separation, runs once | Extra container |
-| **App startup code** | No extra container | App responsibility bloat |
-| **Volume with pre-made data** | Fast startup | Fragile, hard to maintain |
+| Option                        | Pros                        | Cons                      |
+| ----------------------------- | --------------------------- | ------------------------- |
+| **Init container**            | Clean separation, runs once | Extra container           |
+| **App startup code**          | No extra container          | App responsibility bloat  |
+| **Volume with pre-made data** | Fast startup                | Fragile, hard to maintain |
 
 **Decision: Init container using MinIO Client (mc)** - Clean, reliable, idempotent.
 
@@ -260,8 +263,8 @@ depends_on:
 rustfs:
   image: rustfs/rustfs:latest
   ports:
-    - "9000:9000"   # S3 API endpoint
-    - "9001:9001"   # Web console
+    - "9000:9000" # S3 API endpoint
+    - "9001:9001" # Web console
   environment:
     - RUSTFS_ROOT_USER=rustfsadmin
     - RUSTFS_ROOT_PASSWORD=rustfsadmin
@@ -270,6 +273,7 @@ rustfs:
 ```
 
 **Why:**
+
 - Port 9000: Standard S3 API endpoint
 - Port 9001: Web console for debugging
 - Persistent volumes: Data survives restarts
@@ -291,12 +295,12 @@ rustfs-init:
     "
 ```
 
-| Step | What | Why |
-|------|------|-----|
-| `sleep 10` | Wait for RustFS | Ensure storage is ready |
-| `mc alias set` | Configure endpoint | Tell mc where storage is |
-| `mc mb --ignore-existing` | Create bucket | Idempotent bucket creation |
-| `exit 0` | Exit successfully | Signal Docker to continue |
+| Step                      | What               | Why                        |
+| ------------------------- | ------------------ | -------------------------- |
+| `sleep 10`                | Wait for RustFS    | Ensure storage is ready    |
+| `mc alias set`            | Configure endpoint | Tell mc where storage is   |
+| `mc mb --ignore-existing` | Create bucket      | Idempotent bucket creation |
+| `exit 0`                  | Exit successfully  | Signal Docker to continue  |
 
 ### 3. Configured S3 Environment Variables
 
@@ -360,6 +364,7 @@ volumes:
 ```
 
 **Without `S3_FORCE_PATH_STYLE=true`:**
+
 ```
 SDK tries: https://downloads.rustfs:9000/__health_check_marker__
            ^^^^^^^^^ - This DNS name doesn't exist!
@@ -367,6 +372,7 @@ Result: ENOTFOUND error
 ```
 
 **With `S3_FORCE_PATH_STYLE=true`:**
+
 ```
 SDK tries: http://rustfs:9000/downloads/__health_check_marker__
 Result: Works perfectly!
@@ -376,17 +382,17 @@ Result: Works perfectly!
 
 ```javascript
 const checkS3Health = async () => {
-  if (!env.S3_BUCKET_NAME) return true;  // [A] Mock mode
+  if (!env.S3_BUCKET_NAME) return true; // [A] Mock mode
   try {
     const command = new HeadObjectCommand({
       Bucket: env.S3_BUCKET_NAME,
       Key: "__health_check_marker__",
     });
-    await s3Client.send(command);  // [B] Success
+    await s3Client.send(command); // [B] Success
     return true;
   } catch (err) {
-    if (err instanceof Error && err.name === "NotFound") return true;  // [C] NotFound = OK
-    return false;  // [D] Other error = unhealthy
+    if (err instanceof Error && err.name === "NotFound") return true; // [C] NotFound = OK
+    return false; // [D] Other error = unhealthy
   }
 };
 ```
@@ -540,6 +546,7 @@ curl http://localhost:3000/health
 ```
 
 **Expected Response:**
+
 ```json
 {
   "status": "healthy",
@@ -557,6 +564,7 @@ npm run test:e2e
 ```
 
 The E2E tests verify:
+
 - Health endpoint returns valid status
 - Storage check field is present
 - Download check endpoint works correctly
@@ -695,11 +703,13 @@ catch (err) {
 A health check should answer: "Can I do my job?"
 
 For S3 storage, "healthy" means:
+
 - ✓ Can connect to the endpoint
 - ✓ Have valid credentials
 - ✓ Bucket exists and is accessible
 
 It does NOT require:
+
 - Specific files to exist
 - Certain amount of data
 - Write permissions (if read-only is acceptable)
@@ -783,19 +793,19 @@ curl http://localhost:3000/health
 
 ### Key Learnings
 
-| Learning | Description |
-|----------|-------------|
-| **Path Style URLs** | Self-hosted S3 requires `S3_FORCE_PATH_STYLE=true` |
-| **Init Containers** | Use separate containers for one-time setup tasks |
-| **Service Dependencies** | Use `condition: service_completed_successfully` |
-| **Graceful Health Checks** | `NotFound` error still indicates healthy storage |
-| **Docker Networking** | Use service names, not `localhost` |
+| Learning                   | Description                                        |
+| -------------------------- | -------------------------------------------------- |
+| **Path Style URLs**        | Self-hosted S3 requires `S3_FORCE_PATH_STYLE=true` |
+| **Init Containers**        | Use separate containers for one-time setup tasks   |
+| **Service Dependencies**   | Use `condition: service_completed_successfully`    |
+| **Graceful Health Checks** | `NotFound` error still indicates healthy storage   |
+| **Docker Networking**      | Use service names, not `localhost`                 |
 
 ### Files Modified
 
-| File | Changes |
-|------|---------|
-| `docker/compose.dev.yml` | Added RustFS, rustfs-init, S3 env vars, dependencies |
+| File                      | Changes                                              |
+| ------------------------- | ---------------------------------------------------- |
+| `docker/compose.dev.yml`  | Added RustFS, rustfs-init, S3 env vars, dependencies |
 | `docker/compose.prod.yml` | Added RustFS, rustfs-init, S3 env vars, dependencies |
-| `docker/Dockerfile.dev` | Updated command for environment variable handling |
-| `.env.example` | Updated credentials to match RustFS defaults |
+| `docker/Dockerfile.dev`   | Updated command for environment variable handling    |
+| `.env.example`            | Updated credentials to match RustFS defaults         |

@@ -6,7 +6,7 @@
 
 **Demo Video:** [Watch Demo](images/gif.mp4)
 
-**Original Challenge Requirements:** See [`README(Given).md`](./README(Given).md) for the complete hackathon challenge description.
+**Original Challenge Requirements:** See [`README(Given).md`](<./README(Given).md>) for the complete hackathon challenge description.
 
 ---
 
@@ -396,6 +396,7 @@ cat .github/workflows/ci.yml
 # - build: Docker image build
 # - security: CodeQL + npm audit
 ```
+
 ---
 
 ### Challenge 4: Observability Dashboard Testing
@@ -920,27 +921,27 @@ VITE_JAEGER_UI_URL=http://localhost:16686
 
 ### Project Documentation
 
-| Document | Description |
-|----------|-------------|
-| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Complete architecture design for long-running downloads |
-| [`SUBMISSION.md`](./SUBMISSION.md) | Hackathon submission summary and deliverables |
-| [`README(Given).md`](./README(Given).md) | Original hackathon challenge requirements |
+| Document                                   | Description                                             |
+| ------------------------------------------ | ------------------------------------------------------- |
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md)     | Complete architecture design for long-running downloads |
+| [`SUBMISSION.md`](./SUBMISSION.md)         | Hackathon submission summary and deliverables           |
+| [`README(Given).md`](<./README(Given).md>) | Original hackathon challenge requirements               |
 
 ### Challenge-Specific Documentation
 
-| Document | Description |
-|----------|-------------|
-| [`docs/CHALLENGE-1-COMPLETE.md`](./docs/CHALLENGE-1-COMPLETE.md) | Challenge 1: S3 Storage Integration - Complete guide |
+| Document                                                         | Description                                                                        |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [`docs/CHALLENGE-1-COMPLETE.md`](./docs/CHALLENGE-1-COMPLETE.md) | Challenge 1: S3 Storage Integration - Complete guide                               |
 | [`docs/CHALLENGE-2-COMPLETE.md`](./docs/CHALLENGE-2-COMPLETE.md) | Challenge 2: Long-Running Downloads - Project documentation (API, testing, config) |
-| [`docs/CHALLENGE-2-CONCEPTS.md`](./docs/CHALLENGE-2-CONCEPTS.md) | Challenge 2: Conceptual guide (patterns, analogies, architecture) |
+| [`docs/CHALLENGE-2-CONCEPTS.md`](./docs/CHALLENGE-2-CONCEPTS.md) | Challenge 2: Conceptual guide (patterns, analogies, architecture)                  |
 
 ### Testing & Operations
 
-| Document | Description |
-|----------|-------------|
+| Document                                           | Description                                          |
+| -------------------------------------------------- | ---------------------------------------------------- |
 | [`docs/TESTING_GUIDE.md`](./docs/TESTING_GUIDE.md) | Complete testing instructions and verification steps |
-| [`docs/DOWNLOAD_API.md`](./docs/DOWNLOAD_API.md) | Download API documentation |
-| [`docs/FUTURE_WORK.md`](./docs/FUTURE_WORK.md) | Production roadmap and future improvements |
+| [`docs/DOWNLOAD_API.md`](./docs/DOWNLOAD_API.md)   | Download API documentation                           |
+| [`docs/FUTURE_WORK.md`](./docs/FUTURE_WORK.md)     | Production roadmap and future improvements           |
 
 ---
 
@@ -957,6 +958,6 @@ VITE_JAEGER_UI_URL=http://localhost:16686
 
 ### Hackathon Reference
 
-This project was built for the **CUET Fest 2025 Hackathon** organized by [Delineate](https://github.com/bongodev). See [`README(Given).md`](./README(Given).md) for the original challenge requirements.
+This project was built for the **CUET Fest 2025 Hackathon** organized by [Delineate](https://github.com/bongodev). See [`README(Given).md`](<./README(Given).md>) for the original challenge requirements.
 
 ---

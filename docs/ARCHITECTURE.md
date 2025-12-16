@@ -553,6 +553,7 @@ App.tsx
 └── Traces Tab
     └── TraceViewer.tsx       # Jaeger UI link & trace lookup
 ```
+
 ![Frontend Architecture Diagram](./assets/frontend.svg)
 
 ## Error Handling & Resilience
@@ -697,6 +698,7 @@ if (existingJob) {
   }
 }
 ```
+
 ---
 
 ## Summary

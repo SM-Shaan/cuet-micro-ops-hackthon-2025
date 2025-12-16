@@ -6,10 +6,10 @@ This guide explains how to set up and use Sentry for error tracking in this proj
 
 Sentry is integrated in both the **backend** (Node.js/Hono) and **frontend** (React/Vite) applications.
 
-| Component | SDK | Environment Variable |
-|-----------|-----|---------------------|
-| Backend | `@sentry/node` + `@hono/sentry` | `SENTRY_DSN` |
-| Frontend | `@sentry/react` | `VITE_SENTRY_DSN` |
+| Component | SDK                             | Environment Variable |
+| --------- | ------------------------------- | -------------------- |
+| Backend   | `@sentry/node` + `@hono/sentry` | `SENTRY_DSN`         |
+| Frontend  | `@sentry/react`                 | `VITE_SENTRY_DSN`    |
 
 ---
 
@@ -24,6 +24,7 @@ Sentry is integrated in both the **backend** (Node.js/Hono) and **frontend** (Re
 5. Copy the **DSN** provided
 
 The DSN looks like:
+
 ```
 https://abc123@o123456.ingest.sentry.io/1234567
 ```
@@ -182,6 +183,7 @@ window.Sentry?.captureMessage("Test message from frontend");
 3. Filter by: `platform:javascript`
 
 You should see the error with:
+
 - Browser info (Chrome, Firefox, etc.)
 - Stack trace
 - Session replay (if enabled)
@@ -189,11 +191,13 @@ You should see the error with:
 #### Verification
 
 Check browser console for Sentry initialization message. If you see:
+
 ```
 Sentry DSN not configured. Error tracking disabled.
 ```
 
 Rebuild the frontend:
+
 ```bash
 docker compose -f docker/compose.dev.yml up --build -d delineate-dashboard
 ```
@@ -210,12 +214,12 @@ docker compose -f docker/compose.dev.yml up --build -d delineate-dashboard
 
 ### Filtering Errors
 
-| Filter | Description |
-|--------|-------------|
-| `platform:node` | Backend errors only |
-| `platform:javascript` | Frontend errors only |
-| `environment:production` | Production errors |
-| `environment:development` | Development errors |
+| Filter                    | Description          |
+| ------------------------- | -------------------- |
+| `platform:node`           | Backend errors only  |
+| `platform:javascript`     | Frontend errors only |
+| `environment:production`  | Production errors    |
+| `environment:development` | Development errors   |
 
 ### Error Details
 
@@ -267,12 +271,14 @@ open http://localhost
 ### Errors Not Appearing in Sentry
 
 1. **Check DSN is set:**
+
    ```bash
    # Backend container
    docker compose -f docker/compose.dev.yml exec delineate-app env | grep SENTRY
    ```
 
 2. **Check logs for Sentry initialization:**
+
    ```bash
    docker compose -f docker/compose.dev.yml logs delineate-app
    ```
@@ -290,6 +296,7 @@ open http://localhost
 The `${SENTRY_DSN}` in docker-compose reads from the host environment or `.env` file in the same directory as the compose file.
 
 Solution:
+
 ```bash
 cp .env docker/.env
 docker compose -f docker/compose.prod.yml up --build -d
@@ -304,10 +311,11 @@ docker compose -f docker/compose.prod.yml up --build -d
 3. **Configure alerts** for new errors via email/Slack
 4. **Use breadcrumbs** to track user actions before errors
 5. **Mask sensitive data** in frontend replay settings
-6. Switching Environment: 
+6. Switching Environment:
+
 ```
 docker compose -f docker/compose.prod.yml down
-docker compose -f docker/compose.dev.yml up --build -d 
+docker compose -f docker/compose.dev.yml up --build -d
 ```
 
 ## 9. Useful Links
@@ -316,8 +324,5 @@ docker compose -f docker/compose.dev.yml up --build -d
 - [Sentry Node.js SDK](https://docs.sentry.io/platforms/javascript/guides/node/)
 - [Sentry React SDK](https://docs.sentry.io/platforms/javascript/guides/react/)
 - [Hono Sentry Middleware](https://hono.dev/docs/middleware/builtin/sentry)
-
-
-
 
 ## Questions:

@@ -11,30 +11,44 @@ This guide helps you present and demonstrate the Observability Dashboard (Challe
 The following tests were executed and verified on 2025-12-12:
 
 ### Test 1: Health Check ✅
+
 ```bash
 curl -s http://localhost:3000/health
 ```
+
 **Result:**
+
 ```json
-{"status":"healthy","checks":{"storage":"ok"}}
+{ "status": "healthy", "checks": { "storage": "ok" } }
 ```
 
 ### Test 2: Async Download with Polling ✅
+
 ```bash
 # Step 1: Initiate download
 curl -s -X POST http://localhost:3000/v1/download/start \
   -H "Content-Type: application/json" \
   -d '{"file_id": 70028, "user_id": "demo-user"}'
 ```
+
 **Result:**
+
 ```json
-{"jobId":"628cba62-fd35-4543-9979-5a9c3233f7fd","userId":"demo-user","fileId":70028,"status":"queued","message":"Download job queued. Poll the status URL for updates.","pollUrl":"/v1/download/status/demo-user"}
+{
+  "jobId": "628cba62-fd35-4543-9979-5a9c3233f7fd",
+  "userId": "demo-user",
+  "fileId": 70028,
+  "status": "queued",
+  "message": "Download job queued. Poll the status URL for updates.",
+  "pollUrl": "/v1/download/status/demo-user"
+}
 ```
 
 ```bash
 # Step 2: Poll for status (shows progress)
 curl -s http://localhost:3000/v1/download/status/demo-user
 ```
+
 **Results over time:**
 | Poll | Status | Progress | Details |
 |------|--------|----------|---------|
@@ -43,23 +57,39 @@ curl -s http://localhost:3000/v1/download/status/demo-user
 | 3 (3s) | `completed/failed` | 100% | Processing time: 2.9s |
 
 ### Test 3: Sentry Error Trigger ✅
+
 ```bash
 curl -s -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
   -H "Content-Type: application/json" \
   -d '{"file_id": 70000}'
 ```
+
 **Result:**
+
 ```json
-{"error":"Internal Server Error","message":"Sentry test error triggered for file_id=70000 - This should appear in Sentry!","requestId":"5403069c-2943-450c-9bdb-40c432c76ac9"}
+{
+  "error": "Internal Server Error",
+  "message": "Sentry test error triggered for file_id=70000 - This should appear in Sentry!",
+  "requestId": "5403069c-2943-450c-9bdb-40c432c76ac9"
+}
 ```
 
 ### Test 4: Jaeger Service Discovery ✅
+
 ```bash
 curl -s "http://localhost:16686/api/services"
 ```
+
 **Result:**
+
 ```json
-{"data":["jaeger-all-in-one"],"total":1,"limit":0,"offset":0,"errors":null}
+{
+  "data": ["jaeger-all-in-one"],
+  "total": 1,
+  "limit": 0,
+  "offset": 0,
+  "errors": null
+}
 ```
 
 ---
@@ -77,12 +107,12 @@ npm run docker:dev
 
 ### 2. Access Points
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| **Dashboard** | http://localhost:5173 | Main observability UI |
-| **API** | http://localhost:3000 | Backend API |
-| **API Docs** | http://localhost:3000/docs | Swagger/OpenAPI |
-| **Jaeger UI** | http://localhost:16686 | Distributed tracing |
+| Service       | URL                        | Purpose               |
+| ------------- | -------------------------- | --------------------- |
+| **Dashboard** | http://localhost:5173      | Main observability UI |
+| **API**       | http://localhost:3000      | Backend API           |
+| **API Docs**  | http://localhost:3000/docs | Swagger/OpenAPI       |
+| **Jaeger UI** | http://localhost:16686     | Distributed tracing   |
 
 ---
 
@@ -91,11 +121,13 @@ npm run docker:dev
 ### Part 1: Dashboard Overview (2 min)
 
 **What to show:**
+
 1. Open http://localhost:5173
 2. Point out the three tabs: **Dashboard**, **Downloads**, **Traces**
 3. Show the header with "Open Jaeger UI" link
 
 **Key talking points:**
+
 - "This is our observability dashboard built with React and Vite"
 - "It provides real-time visibility into our download service"
 - "Integrates Sentry for error tracking and OpenTelemetry for distributed tracing"
@@ -105,6 +137,7 @@ npm run docker:dev
 ### Part 2: Health Status (2 min)
 
 **What to show:**
+
 1. Point to the **API Health** card
 2. Show the green "Healthy" status
 3. Show "Storage (S3): OK" check
@@ -112,17 +145,20 @@ npm run docker:dev
 5. Point out the trace ID in the footer
 
 **Proof of working:**
+
 ```bash
 # In terminal, verify the health endpoint
 curl http://localhost:3000/health
 ```
 
 Expected output:
+
 ```json
-{"status":"healthy","checks":{"storage":"ok"}}
+{ "status": "healthy", "checks": { "storage": "ok" } }
 ```
 
 **Key talking points:**
+
 - "Health checks run every 30 seconds automatically"
 - "We check S3 storage connectivity"
 - "Each health check creates a trace for debugging"
@@ -132,6 +168,7 @@ Expected output:
 ### Part 3: Download Testing with Tracing (3 min)
 
 **What to show:**
+
 1. Go to the **Download Tester** section
 2. Keep the default file ID (70000)
 3. Click "Check Availability" first
@@ -159,6 +196,7 @@ Step 3: Show Trace ID
 ```
 
 **Key talking points:**
+
 - "Downloads have simulated delays to demonstrate long-running operations"
 - "Every action creates an OpenTelemetry span"
 - "The trace ID propagates from frontend to backend"
@@ -168,12 +206,14 @@ Step 3: Show Trace ID
 ### Part 4: Distributed Tracing with Jaeger (3 min)
 
 **What to show:**
+
 1. Copy the trace ID from the dashboard
 2. Go to **Traces** tab
 3. Click "Open Jaeger UI" OR paste trace ID and click "View"
 4. In Jaeger, show the trace waterfall
 
 **In Jaeger UI:**
+
 1. Select service: `delineate-dashboard` or `delineate-api`
 2. Click "Find Traces"
 3. Click on a trace to see the waterfall view
@@ -187,6 +227,7 @@ Step 3: Show Trace ID
 **Screenshot opportunity:** Capture the Jaeger trace view showing frontend-to-backend correlation.
 
 **Key talking points:**
+
 - "Jaeger shows the complete request flow"
 - "We can see exactly how long each operation took"
 - "Frontend and backend spans are correlated by trace ID"
@@ -196,6 +237,7 @@ Step 3: Show Trace ID
 ### Part 5: Error Tracking with Sentry (3 min)
 
 **What to show:**
+
 1. Go back to Dashboard tab
 2. Find the **Error Log** card
 3. Click "Test Sentry" button
@@ -203,6 +245,7 @@ Step 3: Show Trace ID
 5. Point out the trace ID attached to the error
 
 **Demo the Sentry test:**
+
 ```bash
 # This is what the "Test Sentry" button calls:
 curl -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
@@ -211,11 +254,16 @@ curl -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
 ```
 
 Expected response:
+
 ```json
-{"error":"Internal Server Error","message":"Sentry test error triggered..."}
+{
+  "error": "Internal Server Error",
+  "message": "Sentry test error triggered..."
+}
 ```
 
 **If Sentry DSN is configured:**
+
 1. Open your Sentry dashboard
 2. Show the error appearing in real-time
 3. Click on the error to show:
@@ -224,6 +272,7 @@ Expected response:
    - Tags including `trace_id`
 
 **Key talking points:**
+
 - "Errors are captured automatically by Sentry"
 - "Each error is tagged with the trace ID for correlation"
 - "We can click through from error → Jaeger trace"
@@ -233,6 +282,7 @@ Expected response:
 ### Part 6: Performance Metrics (1 min)
 
 **What to show:**
+
 1. Point to the **Performance Metrics** card
 2. Show the four metrics:
    - Avg Response Time (ms)
@@ -241,10 +291,12 @@ Expected response:
    - Active Jobs
 
 **After running a few downloads:**
+
 - Show how metrics update in real-time
 - Click "Reset" to clear metrics
 
 **Key talking points:**
+
 - "Metrics are calculated from your session"
 - "In production, these would come from Prometheus/Grafana"
 - "Shows at-a-glance service health"
@@ -256,29 +308,35 @@ Expected response:
 Take screenshots at these moments:
 
 ### 1. Dashboard Overview
+
 - Full dashboard with all cards visible
 - Health showing "Healthy"
 
 ### 2. Download in Progress
+
 - Download Tester showing "Processing..."
 - Spinner animation visible
 
 ### 3. Completed Download
+
 - Job status showing "completed" or "failed"
 - Processing time displayed
 - Trace ID visible
 
 ### 4. Jaeger Trace View
+
 - Trace waterfall showing multiple spans
 - Frontend and backend services visible
 - Timing information
 
 ### 5. Error in Error Log
+
 - Error entry with message
 - Trace ID attached
 - Timestamp
 
 ### 6. Sentry Dashboard (if configured)
+
 - Error event in Sentry
 - Tags showing trace_id
 - Breadcrumbs
@@ -288,11 +346,13 @@ Take screenshots at these moments:
 ## Terminal Commands for Live Demo
 
 ### Health Check
+
 ```bash
 curl -s http://localhost:3000/health | jq
 ```
 
 ### Download Check
+
 ```bash
 curl -s -X POST http://localhost:3000/v1/download/check \
   -H "Content-Type: application/json" \
@@ -300,6 +360,7 @@ curl -s -X POST http://localhost:3000/v1/download/check \
 ```
 
 ### Download Start (shows delay)
+
 ```bash
 time curl -s -X POST http://localhost:3000/v1/download/start \
   -H "Content-Type: application/json" \
@@ -307,6 +368,7 @@ time curl -s -X POST http://localhost:3000/v1/download/start \
 ```
 
 ### Trigger Sentry Error
+
 ```bash
 curl -s -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
   -H "Content-Type: application/json" \
@@ -356,12 +418,14 @@ curl -s -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
 ## Feature Checklist for Judges
 
 ### React Application ✅
+
 - [x] Connects to download API
 - [x] Displays download job status
 - [x] Shows real-time error tracking
 - [x] Visualizes trace data
 
 ### Sentry Integration ✅
+
 - [x] Error boundary wrapping entire app
 - [x] Automatic error capture for failed API calls
 - [x] User feedback dialog on errors (`showDialog`)
@@ -369,12 +433,14 @@ curl -s -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
 - [x] Custom error logging with context
 
 ### OpenTelemetry Integration ✅
+
 - [x] Trace propagation from frontend to backend
 - [x] Custom spans for user interactions
 - [x] Correlation of frontend and backend traces
 - [x] Display trace IDs in the UI
 
 ### Dashboard Features ✅
+
 - [x] Health Status - Real-time from `/health`
 - [x] Download Jobs - List with status
 - [x] Error Log - Recent errors with Sentry
@@ -382,6 +448,7 @@ curl -s -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
 - [x] Performance Metrics - Response times, success rates
 
 ### End-to-End Traceability ✅
+
 ```
 User clicks "Download" → Frontend span (trace_id=abc123)
                        → API request (traceparent: 00-abc123-...)
@@ -413,6 +480,7 @@ A: Yes! Failed requests still create traces. In Jaeger, you can filter by error 
 ## Troubleshooting During Demo
 
 ### Dashboard not loading
+
 ```bash
 # Check if services are running
 docker ps
@@ -422,6 +490,7 @@ npm run docker:dev
 ```
 
 ### Health shows "Unhealthy"
+
 ```bash
 # Check S3 connectivity
 curl http://localhost:9000
@@ -429,6 +498,7 @@ curl http://localhost:9000
 ```
 
 ### Traces not appearing in Jaeger
+
 ```bash
 # Check Jaeger is running
 curl http://localhost:16686
@@ -438,6 +508,7 @@ curl http://localhost:4318/v1/traces -X POST
 ```
 
 ### Sentry errors not appearing
+
 - Verify `SENTRY_DSN` is set in `.env`
 - Check browser console for Sentry initialization
 - Errors may take 1-2 minutes to appear in Sentry dashboard
@@ -449,6 +520,7 @@ curl http://localhost:4318/v1/traces -X POST
 ### Challenge 4: Observability Dashboard
 
 **What we built:**
+
 - React dashboard with Vite + TypeScript + Tailwind
 - Real-time health monitoring
 - Download testing interface
@@ -456,13 +528,15 @@ curl http://localhost:4318/v1/traces -X POST
 - Distributed tracing with OpenTelemetry + Jaeger
 
 **Key achievements:**
+
 - End-to-end trace correlation (frontend ↔ backend)
 - Automatic error capture with context
 - Performance metrics visualization
 - One-click Jaeger trace lookup
 
 **Technologies:**
+
 - @sentry/react for error tracking
-- @opentelemetry/* for distributed tracing
+- @opentelemetry/\* for distributed tracing
 - Jaeger for trace visualization
 - Docker Compose for local stack
