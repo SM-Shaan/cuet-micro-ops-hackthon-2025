@@ -116,6 +116,16 @@ export function DownloadTester() {
 
           if (!response.ok) {
             const error = await response.json();
+            // Handle 503 Service Unavailable specifically
+            if (response.status === 503) {
+              const serviceError = new Error(
+                error.message || "Service temporarily unavailable",
+              );
+              (
+                serviceError as Error & { isServiceError: boolean }
+              ).isServiceError = true;
+              throw serviceError;
+            }
             throw new Error(error.message || "Download failed");
           }
 
@@ -204,12 +214,12 @@ export function DownloadTester() {
 
   return (
     <div className="card">
-      <h2 className="text-lg font-semibold mb-4">Download Tester</h2>
+      <h2 className="text-lg font-semibold text-slate-900 mb-4">Download Tester</h2>
 
       <div className="space-y-4">
         {/* File ID Input */}
         <div>
-          <label className="block text-sm text-gray-400 mb-1">
+          <label className="block text-sm font-medium text-slate-600 mb-1">
             File ID (10,000 - 100,000,000)
           </label>
           <input
@@ -218,7 +228,7 @@ export function DownloadTester() {
             max={100000000}
             value={fileId}
             onChange={(e) => setFileId(Number(e.target.value))}
-            className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="input"
           />
         </div>
 
@@ -227,10 +237,10 @@ export function DownloadTester() {
           <button
             onClick={startDownload}
             disabled={loading}
-            className={`flex-1 py-2 px-4 rounded font-medium transition-colors ${
+            className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-colors ${
               loading
-                ? "bg-gray-600 cursor-not-allowed"
-                : "bg-blue-500 hover:bg-blue-600"
+                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
             }`}
           >
             {loading ? (
@@ -261,7 +271,7 @@ export function DownloadTester() {
           <button
             onClick={checkAvailability}
             disabled={loading}
-            className="px-4 py-2 rounded font-medium bg-gray-700 hover:bg-gray-600 transition-colors disabled:opacity-50"
+            className="btn-secondary disabled:opacity-50"
           >
             Check Availability
           </button>
@@ -269,15 +279,15 @@ export function DownloadTester() {
 
         {/* Current Job Status */}
         {currentJob && (
-          <div className="bg-gray-700/50 rounded-lg p-4 space-y-2">
+          <div className="bg-slate-50 rounded-lg p-4 space-y-3 border border-slate-200">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Current Job</span>
+              <span className="text-sm font-medium text-slate-500">Current Job</span>
               <span className={`status-badge status-${currentJob.status}`}>
                 {currentJob.status}
               </span>
             </div>
 
-            <div className="text-sm font-mono">
+            <div className="text-sm font-mono text-slate-600">
               ID: {currentJob.id.slice(0, 8)}...
             </div>
 
@@ -285,13 +295,13 @@ export function DownloadTester() {
             {(currentJob.status === "processing" ||
               currentJob.status === "pending") && (
               <div className="space-y-1">
-                <div className="flex justify-between text-xs text-gray-400">
+                <div className="flex justify-between text-xs text-slate-500">
                   <span>Progress</span>
                   <span>{currentJob.progress}%</span>
                 </div>
-                <div className="w-full bg-gray-600 rounded-full h-2">
+                <div className="progress-bar">
                   <div
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    className="progress-bar-fill"
                     style={{ width: `${currentJob.progress}%` }}
                   />
                 </div>
@@ -299,7 +309,7 @@ export function DownloadTester() {
             )}
 
             {currentJob.processingTimeMs && (
-              <div className="text-sm text-gray-400">
+              <div className="text-sm text-slate-500">
                 Processing time:{" "}
                 {(currentJob.processingTimeMs / 1000).toFixed(1)}s
               </div>
@@ -311,7 +321,7 @@ export function DownloadTester() {
                 <a
                   href={`/api${currentJob.downloadUrl}`}
                   download
-                  className="text-blue-400 hover:text-blue-300 underline"
+                  className="text-blue-600 hover:text-blue-700 font-medium underline"
                 >
                   Download File
                 </a>
@@ -320,24 +330,51 @@ export function DownloadTester() {
 
             {/* Show message for completed jobs */}
             {currentJob.status === "completed" && !currentJob.downloadUrl && (
-              <div className="text-sm text-green-400 bg-green-500/10 p-2 rounded">
+              <div className="alert-success text-sm">
                 Job completed successfully
               </div>
             )}
 
             {/* Show error/message for failed jobs */}
             {currentJob.status === "failed" && currentJob.error && (
-              <div className="text-sm text-yellow-400 bg-yellow-500/10 p-2 rounded">
-                <div className="font-medium">Job completed with message:</div>
-                <div className="mt-1">{currentJob.error}</div>
-                <div className="text-xs text-gray-400 mt-1">
-                  (File may not exist in S3 storage)
+              <div
+                className={`text-sm p-3 rounded-lg ${
+                  currentJob.error.includes("unavailable") ||
+                  currentJob.error.includes("Service")
+                    ? "alert-error"
+                    : "alert-warning"
+                }`}
+              >
+                <div className="font-medium">
+                  {currentJob.error.includes("unavailable") ||
+                  currentJob.error.includes("Service")
+                    ? "Service Error"
+                    : "Job completed with message:"}
                 </div>
+                <div className="mt-1">{currentJob.error}</div>
+                {currentJob.error.includes("unavailable") ||
+                currentJob.error.includes("Service") ? (
+                  <div className="text-xs opacity-80 mt-2">
+                    Check the System Health panel. Redis or S3 may be down.
+                    <button
+                      onClick={() =>
+                        window.dispatchEvent(new CustomEvent("checkHealth"))
+                      }
+                      className="ml-2 text-blue-600 hover:text-blue-700 underline"
+                    >
+                      Refresh Health
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-xs opacity-80 mt-1">
+                    (File may not exist in S3 storage)
+                  </div>
+                )}
               </div>
             )}
 
             {getCurrentTraceId() && (
-              <div className="text-xs text-gray-500 font-mono">
+              <div className="text-xs text-slate-400 font-mono">
                 trace: {getCurrentTraceId()?.slice(0, 16)}...
               </div>
             )}
@@ -345,14 +382,14 @@ export function DownloadTester() {
         )}
 
         {/* Info */}
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-slate-400 space-y-1">
           <p>
             Downloads have simulated delays (5-15s in dev, 10-120s in prod).
           </p>
           <p>
             Trace IDs are propagated to the backend for distributed tracing.
           </p>
-          <p className="text-green-500/70 mt-1">
+          <p className="text-emerald-600">
             Mock mode: File IDs divisible by 7 (e.g., 70000, 70007) succeed.
             Other IDs will show "File not found".
           </p>

@@ -12,6 +12,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:e2e": "node scripts/run-e2e.js",
+    "test:e2e:only": "node scripts/e2e-test.js",
+    "test:quick": "node scripts/quick-test.js",
+    "test:resilience": "bash scripts/resilience-test.sh",
     "docker:dev": "docker compose -f docker/compose.dev.yml up --build",
     "docker:prod": "docker compose -f docker/compose.prod.yml up --build -d"
   },
@@ -31,6 +34,7 @@
     "hono": "^4.10.8",
     "hono-rate-limiter": "^0.4.2",
     "ioredis": "^5.8.2",
+    "opossum": "^9.0.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {

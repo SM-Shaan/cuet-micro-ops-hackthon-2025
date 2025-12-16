@@ -1,10 +1,30 @@
-# Delineate Hackathon Challenge - CUET Fest 2025
+# Delineate - CUET Micro-Ops Hackathon 2025 Submission
 
 [![CI](https://github.com/bongodev/cuet-micro-ops-hackthon-2025/actions/workflows/ci.yml/badge.svg)](https://github.com/bongodev/cuet-micro-ops-hackthon-2025/actions/workflows/ci.yml)
 
-## The Scenario
+> A production-ready file download microservice with S3 storage, observability, and CI/CD pipeline - built for the CUET Fest 2025 Hackathon.
 
-This microservice simulates a **real-world file download system** where processing times vary significantly:
+**Demo Video:** [Watch Demo](images/gif.mp4)
+
+**Original Challenge Requirements:** See [`README(Given).md`](./README(Given).md) for the complete hackathon challenge description.
+
+---
+
+## Challenge Summary
+
+| Challenge                           | Max Points | Status    |
+| ----------------------------------- | ---------- | --------- |
+| Challenge 1: S3 Storage Integration | 15         | Completed |
+| Challenge 2: Architecture Design    | 15         | Completed |
+| Challenge 3: CI/CD Pipeline         | 10         | Completed |
+| Challenge 4: Observability (Bonus)  | 10         | Completed |
+| **Total**                           | **50**     |           |
+
+---
+
+## The Problem
+
+This microservice simulates a **real-world file download system** with variable processing times:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -18,7 +38,7 @@ This microservice simulates a **real-world file download system** where processi
 
 **Why does this matter?**
 
-When you deploy this service behind a reverse proxy (Cloudflare, nginx, AWS ALB), you'll encounter:
+When deployed behind a reverse proxy (Cloudflare, nginx, AWS ALB), you encounter:
 
 | Problem                 | Impact                                        |
 | ----------------------- | --------------------------------------------- |
@@ -27,381 +47,493 @@ When you deploy this service behind a reverse proxy (Cloudflare, nginx, AWS ALB)
 | **Poor UX**             | No progress feedback during long waits        |
 | **Resource Waste**      | Open connections consume server memory        |
 
-**Try it yourself:**
-
-```bash
-# Start the server (10-120s random delays)
-npm run start
-
-# This request will likely timeout (REQUEST_TIMEOUT_MS=30s)
-curl -X POST http://localhost:3000/v1/download/start \
-  -H "Content-Type: application/json" \
-  -d '{"file_id": 70000}'
-
-# Watch the server logs - you'll see:
-# [Download] Starting file_id=70000 | delay=85.3s (range: 10s-120s) | enabled=true
-```
-
-**Your challenge:** Design solutions that handle these variable processing times gracefully!
-
 ---
 
-## Hackathon Challenges
+## Solutions Implemented
 
-| Challenge                           | Max Points | Difficulty |
-| ----------------------------------- | ---------- | ---------- |
-| Challenge 1: S3 Storage Integration | 15         | Medium     |
-| Challenge 2: Architecture Design    | 15         | Hard       |
-| Challenge 3: CI/CD Pipeline         | 10         | Medium     |
-| Challenge 4: Observability (Bonus)  | 10         | Hard       |
-| **Maximum Total**                   | **50**     |            |
+### Challenge 1: S3 Storage Integration
 
----
+**Self-hosted S3-compatible storage using RustFS**
 
-### Challenge 1: Self-Hosted S3 Storage Integration
+- Added RustFS service to Docker Compose (dev & prod)
+- Automatic bucket creation via init container
+- Proper networking between services
+- Health endpoint returns `{"status": "healthy", "checks": {"storage": "ok", "redis": "ok"}}`
+- Circuit breaker for S3 operations (5s timeout, 30s reset)
+- Redis job storage with TTL for async download jobs
 
-#### Your Mission
+**Files Modified:**
 
-The current Docker configuration does not include a self-hosted S3-compatible storage service. Your challenge is to:
-
-1. **Modify the Docker Compose files** (`docker/compose.dev.yml` and/or `docker/compose.prod.yml`) to include a self-hosted S3-compatible storage service
-2. **Configure the API** to connect to your storage service
-3. **Verify** the health endpoint returns `"storage": "ok"`
-
-#### Recommended S3-Compatible Storage Options
-
-##### Option 1: RustFS (Recommended)
-
-[RustFS](https://github.com/rustfs/rustfs) is a lightweight, high-performance S3-compatible object storage written in Rust.
-
-##### Option 2: MinIO
-
-[MinIO](https://min.io) is a popular, production-ready S3-compatible object storage.
-
-#### Requirements
-
-Your solution must:
-
-- [ ] Add an S3-compatible storage service to Docker Compose
-- [ ] Create the required bucket (`downloads`) on startup
-- [ ] Configure proper networking between services
-- [ ] Update environment variables to connect the API to storage
-- [ ] Pass all E2E tests (`npm run test:e2e`)
-- [ ] Health endpoint must return `{"status": "healthy", "checks": {"storage": "ok"}}`
-
-#### Hints
-
-1. The API expects these S3 environment variables:
-   - `S3_ENDPOINT` - Your storage service URL (e.g., `http://minio:9000`)
-   - `S3_ACCESS_KEY_ID` - Access key
-   - `S3_SECRET_ACCESS_KEY` - Secret key
-   - `S3_BUCKET_NAME` - Bucket name (use `downloads`)
-   - `S3_FORCE_PATH_STYLE` - Set to `true` for self-hosted S3
-
-2. Services in Docker Compose can communicate using service names as hostnames
-
-3. You may need an init container or script to create the bucket
-
-4. Check the `/health` endpoint to verify storage connectivity
-
-#### Testing Your Solution
+- `docker/compose.dev.yml`
+- `docker/compose.prod.yml`
+- `src/index.js` (circuit breaker, Redis integration)
 
 ```bash
-# Run the full test suite
-npm run test:e2e
-
-# Or test manually
+# Verify storage integration
 curl http://localhost:3000/health
-# Expected: {"status":"healthy","checks":{"storage":"ok"}}
-
-curl -X POST http://localhost:3000/v1/download/check \
-  -H "Content-Type: application/json" \
-  -d '{"file_id": 70000}'
+# Expected: {"status":"healthy","checks":{"storage":"ok","redis":"ok"}}
 ```
 
----
+![Health Check Response](images/health.png)
 
-### Challenge 2: Long-Running Download Architecture Design
+**RustFS Console showing S3 bucket:**
 
-#### The Problem
+![RustFS S3 Console](images/s3.png)
 
-This microservice handles file downloads that can vary significantly in processing time:
+**File stored in RustFS:**
 
-- **Fast downloads**: Complete within ~10 seconds
-- **Slow downloads**: Can take up to 120+ seconds
+![File in RustFS](images/70000_rustfs.png)
 
-When integrating this service with a frontend application or external services behind a reverse proxy (like **Cloudflare**, **nginx**, or **AWS ALB**), you will encounter critical issues:
+### Challenge 2: Architecture Design
 
-1. **Connection Timeouts**: Proxies like Cloudflare have default timeouts (100 seconds) and will terminate long-running HTTP connections
-2. **User Experience**: Users waiting 2+ minutes with no feedback leads to poor UX
-3. **Resource Exhaustion**: Holding HTTP connections open for extended periods consumes server resources
-4. **Retry Storms**: If a client's connection is dropped, they may retry, creating duplicate work
+**Polling Pattern (Option A) for long-running downloads**
 
-#### Experience the Problem
+![System Architecture](images/archi.svg)
 
-```bash
-# Start with production delays (10-120 seconds)
-npm run start
+**Data Flow:**
 
-# Try to download - this will likely timeout!
-curl -X POST http://localhost:3000/v1/download/start \
-  -H "Content-Type: application/json" \
-  -d '{"file_id": 70000}'
+![Data Flow Diagram](images/dataflow.svg)
 
-# Server logs will show something like:
-# [Download] Starting file_id=70000 | delay=95.2s (range: 10s-120s) | enabled=true
-# But your request times out at 30 seconds (REQUEST_TIMEOUT_MS)
-```
+![Detailed Data Flow](images/dataflow1.svg)
 
-#### Your Mission
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the complete design including:
 
-Write a **complete implementation plan** that addresses how to integrate this download microservice with a fullstack application while handling variable download times gracefully.
+- Architecture diagrams for fast/slow download paths
+- API contract with async endpoints (`/start`, `/status/:userId`)
+- Redis schema for job tracking with TTL
+- Circuit breaker for S3 resilience (Opossum library)
+- Proxy configurations (nginx, Cloudflare)
+- Frontend React dashboard with polling and progress display
 
-#### Deliverables
+**Key Implementation Details:**
 
-Create a document (`ARCHITECTURE.md`) that includes:
+| Component        | Technology     | Purpose                               |
+| ---------------- | -------------- | ------------------------------------- |
+| Job Storage      | Redis with TTL | Store job status (1 hour TTL)         |
+| Circuit Breaker  | Opossum        | S3 resilience (5s timeout, 30s reset) |
+| Progress Updates | Polling (2s)   | Frontend polls `/status/:userId`      |
+| Failure Handling | 503 responses  | Redis/S3 failures return 503          |
 
-##### 1. Architecture Diagram
+### Challenge 3: CI/CD Pipeline
 
-- Visual representation of the proposed system
-- Show all components and their interactions
-- Include data flow for both fast and slow downloads
-
-##### 2. Technical Approach
-
-Choose and justify ONE of these patterns (or propose your own):
-
-**Option A: Polling Pattern**
-
-```
-Client → POST /download/initiate → Returns jobId immediately
-Client → GET /download/status/:jobId (poll every N seconds)
-Client → GET /download/:jobId (when ready)
-```
-
-**Option B: WebSocket/SSE Pattern**
-
-```
-Client → POST /download/initiate → Returns jobId
-Client → WS /download/subscribe/:jobId (real-time updates)
-Server → Pushes progress updates → Client
-```
-
-**Option C: Webhook/Callback Pattern**
-
-```
-Client → POST /download/initiate { callbackUrl: "..." }
-Server → Processes download asynchronously
-Server → POST callbackUrl with result when complete
-```
-
-**Option D: Hybrid Approach**
-
-Combine multiple patterns based on use case.
-
-##### 3. Implementation Details
-
-For your chosen approach, document:
-
-- **API contract changes** required to the existing endpoints
-- **New endpoints** that need to be created
-- **Database/cache schema** for tracking job status
-- **Background job processing** strategy (queue system, worker processes)
-- **Error handling** and retry logic
-- **Timeout configuration** at each layer
-
-##### 4. Proxy Configuration
-
-Provide example configurations for handling this with:
-
-- Cloudflare (timeout settings, WebSocket support)
-- nginx (proxy timeouts, buffering)
-- Or your preferred reverse proxy
-
-##### 5. Frontend Integration
-
-Describe how a React/Next.js frontend would:
-
-- Initiate downloads
-- Show progress to users
-- Handle completion/failure states
-- Implement retry logic
-
-#### Hints
-
-1. Consider what happens when a user closes their browser mid-download
-2. Think about how to handle multiple concurrent downloads per user
-3. Consider cost implications of your chosen queue/database system
-4. Research: Redis, BullMQ, AWS SQS, Server-Sent Events, WebSockets
-5. Look into presigned S3 URLs for direct downloads
-
----
-
-### Challenge 3: CI/CD Pipeline Setup
-
-#### Your Mission
-
-Set up a complete CI/CD pipeline for this service using a cloud provider's CI/CD platform. The pipeline must run all tests automatically on every push.
-
-#### Requirements
-
-##### Choose One Cloud Provider
-
-##### Pipeline Stages
-
-Your pipeline must include these stages:
+**GitHub Actions pipeline with 4 stages**
 
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│    Lint     │───▶│    Test     │───▶│    Build    │───▶│   Deploy    │
-│  (ESLint,   │    │   (E2E)     │    │  (Docker)   │    │ (Optional)  │
+│    Lint     │───▶│    Test     │───▶│    Build    │    │  Security   │
+│  (ESLint,   │    │   (E2E)     │    │  (Docker)   │    │   (CodeQL)  │
 │  Prettier)  │    │             │    │             │    │             │
 └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-##### Deliverables
+**Features:**
 
-1. **Pipeline Configuration File**
-   - `.github/workflows/ci.yml` (GitHub Actions)
-   - Equivalent for your chosen provider
+- Triggers on push to `main`/`master`/`dev` and pull requests
+- npm dependency caching
+- Docker image build with layer caching
+- CodeQL security analysis
+- npm audit for vulnerability detection
+- Concurrency control (cancels redundant runs)
 
-2. **Pipeline must**:
-   - [ ] Trigger on push to `main`/`master` branch
-   - [ ] Trigger on pull requests
-   - [ ] Run linting (`npm run lint`)
-   - [ ] Run format check (`npm run format:check`)
-   - [ ] Run E2E tests (`npm run test:e2e`)
-   - [ ] Build Docker image
-   - [ ] Cache dependencies for faster builds
-   - [ ] Fail fast on errors
-   - [ ] Report test results clearly
+**File:** `.github/workflows/ci.yml`
 
-3. **Documentation**
-   - Add a "CI/CD" section to README with:
-     - Badge showing pipeline status
-     - Instructions for contributors
-     - How to run tests locally before pushing
+**E2E Test Results:**
 
-##### Example: GitHub Actions (Reference)
+![E2E Test Results](images/test_e2e.png)
 
-A basic GitHub Actions workflow is already provided at `.github/workflows/ci.yml`. You may:
+**Command Line Download Test:**
 
-- Enhance the existing workflow
-- Migrate to a different provider
-- Add additional features (caching, parallelization, deployment)
+![Download Command](images/70000_cmd.png)
 
-##### Bonus Points
+### Challenge 4: Observability Dashboard
 
-- Set up automatic deployment to a cloud platform (Railway, Render, Fly.io, etc.)
-- Add security scanning (Snyk, CodeQL, Trivy)
-- Implement branch protection rules
-- Add Slack/Discord notifications for build status
+**React + Vite dashboard with Sentry & OpenTelemetry**
+
+| Feature             | Description                                    |
+| ------------------- | ---------------------------------------------- |
+| Health Status       | Real-time API health monitoring                |
+| Download Jobs       | Track download job status and progress         |
+| Error Log           | View errors captured by Sentry                 |
+| Trace Viewer        | Link to Jaeger UI for distributed tracing      |
+| Performance Metrics | API response times and success rates           |
+| Download Tester     | Test download functionality with trace context |
+
+**End-to-end tracing:**
+
+```
+Frontend (trace-id: abc123)
+    │
+    ▼ traceparent header
+Backend logs: [trace_id=abc123]
+    │
+    ▼
+Jaeger UI: View complete trace
+```
+
+![Distributed Tracing in Jaeger](images/tracing.png)
+
+**Sentry Error Tracking:**
+
+![Sentry Error Dashboard](images/sentry_error.png)
+
+**Directory:** `frontend/`
 
 ---
 
-### Challenge 4: Observability Dashboard (Bonus)
+## API Testing & Implementation Verification
 
-#### Your Mission
+This section provides comprehensive testing commands to verify all hackathon challenges are properly implemented.
 
-Build a simple React UI that integrates with **Sentry** for error tracking and **OpenTelemetry** for distributed tracing, providing visibility into the download service's health and performance.
+### Challenge 1: S3 Storage Integration Testing
 
-#### Testing Sentry Integration
-
-The API includes a built-in way to test Sentry error tracking:
+#### Step 1: Start the Docker Environment
 
 ```bash
-# Trigger an intentional error for Sentry testing
-curl -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
+# Start development environment with all services
+npm run docker:dev
+
+# Wait for services to be ready (approximately 15-20 seconds)
+# Check container status
+docker ps
+```
+
+#### Step 2: Verify Health Endpoint (Storage Status)
+
+```bash
+# Test health endpoint - MUST return storage: "ok" and redis: "ok"
+curl -s http://localhost:3000/health
+
+# Expected Response:
+# {
+#   "status": "healthy",
+#   "checks": {
+#     "storage": "ok",
+#     "redis": "ok"
+#   }
+# }
+```
+
+#### Step 3: Verify S3 Bucket Creation
+
+```bash
+# Check if 'downloads' bucket exists in RustFS
+curl -s http://localhost:9000/minio/health/live
+
+# Access RustFS Console to verify bucket
+# Open: http://localhost:9001
+# Login: rustfsadmin / rustfsadmin
+# Verify 'downloads' bucket exists
+```
+
+#### Step 4: Test File Download Check
+
+```bash
+# Check file availability (should work with S3 connection)
+curl -s -X POST http://localhost:3000/v1/download/check \
+  -H "Content-Type: application/json" \
+  -d '{"file_id": 70000}' | jq
+
+# Expected: Returns file check status
+```
+
+#### Step 5: Run E2E Tests
+
+```bash
+# Run full E2E test suite (validates S3 integration)
+npm run test:e2e
+```
+
+---
+
+### Challenge 2: Architecture Design Verification
+
+The architecture design is documented in `ARCHITECTURE.md`. Verify the implementation:
+
+#### Verify API Contract Endpoints
+
+```bash
+# 1. Test root endpoint
+curl -s http://localhost:3000/
+
+# Expected Response:
+# {"message":"Hello Hono!"}
+
+# 2. Test initiate bulk download
+curl -s -X POST http://localhost:3000/v1/download/initiate \
+  -H "Content-Type: application/json" \
+  -d '{"file_ids": [70000, 70001, 70002]}'
+
+# Expected Response:
+# {
+#   "jobId": "uuid-here",
+#   "status": "queued",
+#   "totalFileIds": 3
+# }
+
+# 3. Test single file check
+curl -s -X POST http://localhost:3000/v1/download/check \
   -H "Content-Type: application/json" \
   -d '{"file_id": 70000}'
 
-# Response: {"error":"Internal Server Error","message":"Sentry test error..."}
-# This error should appear in your Sentry dashboard!
+# Expected Response:
+# {
+#   "file_id": 70000,
+#   "available": false,
+#   "s3Key": null,
+#   "size": null
+# }
+
+# 4. Test download start (async - returns immediately)
+curl -s -X POST http://localhost:3000/v1/download/start \
+  -H "Content-Type: application/json" \
+  -d '{"file_id": 70000, "user_id": "test-user-123"}'
+
+# Expected Response (returns immediately):
+# {
+#   "jobId": "uuid-here",
+#   "userId": "test-user-123",
+#   "fileId": 70000,
+#   "status": "queued",
+#   "message": "Download job queued. Poll the status URL for updates.",
+#   "pollUrl": "/v1/download/status/test-user-123"
+# }
+
+# 5. Poll download status
+curl -s http://localhost:3000/v1/download/status/test-user-123
+
+# Expected Response (when processing):
+# {
+#   "jobId": "uuid",
+#   "userId": "test-user-123",
+#   "fileId": 70000,
+#   "status": "processing",
+#   "progress": 50,
+#   "createdAt": 1234567890,
+#   "updatedAt": 1234567891,
+#   ...
+# }
+
+# Expected Response (when completed):
+# {
+#   "jobId": "uuid",
+#   "userId": "test-user-123",
+#   "fileId": 70000,
+#   "status": "completed",
+#   "progress": 100,
+#   "downloadUrl": "presigned-s3-url",
+#   ...
+# }
 ```
 
-#### Requirements
+#### Verify OpenAPI Documentation
 
-##### 1. React Application Setup
+```bash
+# Access OpenAPI spec
+curl -s http://localhost:3000/openapi | jq
 
-Create a React application (using Vite or Next.js) that:
-
-- Connects to this download API
-- Displays download job status
-- Shows real-time error tracking
-- Visualizes trace data
-
-##### 2. Sentry Integration
-
-**Features to implement**:
-
-- [ ] Error boundary wrapping the entire app
-- [ ] Automatic error capture for failed API calls
-- [ ] User feedback dialog on errors
-- [ ] Performance monitoring for page loads
-- [ ] Custom error logging for business logic errors
-
-##### 3. OpenTelemetry Integration
-
-**Features to implement**:
-
-- [ ] Trace propagation from frontend to backend
-- [ ] Custom spans for user interactions
-- [ ] Correlation of frontend and backend traces
-- [ ] Display trace IDs in the UI for debugging
-
-##### 4. Dashboard Features
-
-Build a dashboard that displays:
-
-| Feature             | Description                                  |
-| ------------------- | -------------------------------------------- |
-| Health Status       | Real-time API health from `/health` endpoint |
-| Download Jobs       | List of initiated downloads with status      |
-| Error Log           | Recent errors captured by Sentry             |
-| Trace Viewer        | Link to Jaeger UI or embedded trace view     |
-| Performance Metrics | API response times, success/failure rates    |
-
-##### 5. Correlation
-
-Ensure end-to-end traceability:
-
-```
-User clicks "Download" button
-    │
-    ▼
-Frontend creates span with trace-id: abc123
-    │
-    ▼
-API request includes header: traceparent: 00-abc123-...
-    │
-    ▼
-Backend logs include: trace_id=abc123
-    │
-    ▼
-Errors in Sentry tagged with: trace_id=abc123
+# Access Scalar API Documentation UI
+# Open: http://localhost:3000/docs
 ```
 
-#### Deliverables
+#### Verify Request Timeout Handling
 
-1. **React Application** in a `frontend/` directory
-2. **Docker Compose** update to include:
-   - Frontend service
-   - Jaeger UI accessible for trace viewing
-3. **Documentation** on how to:
-   - Set up Sentry project and get DSN
-   - Configure OpenTelemetry collector
-   - Run the full stack locally
+```bash
+# Test with production delays (10-120s) - demonstrates timeout issue
+npm run start &
 
-#### Resources
+# This request may timeout (demonstrates the problem)
+timeout 35 curl -s -X POST http://localhost:3000/v1/download/start \
+  -H "Content-Type: application/json" \
+  -d '{"file_id": 70000}'
 
-- [Sentry React SDK](https://docs.sentry.io/platforms/javascript/guides/react/)
-- [OpenTelemetry JavaScript](https://opentelemetry.io/docs/instrumentation/js/)
-- [Jaeger UI](https://www.jaegertracing.io/)
-- [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+# Server logs will show:
+# [Download] Starting file_id=70000 | delay=XXs (range: 10s-120s) | enabled=true
+```
 
 ---
 
-## Technical Requirements
+### Challenge 3: CI/CD Pipeline Testing
+
+#### Step 1: Verify Local Lint & Format
+
+```bash
+# Run ESLint (must pass with no errors)
+npm run lint
+
+# Check code formatting
+npm run format:check
+```
+
+#### Step 2: Run E2E Tests Locally
+
+```bash
+# Run full E2E test suite
+npm run test:e2e
+```
+
+#### Step 3: Build Docker Image
+
+```bash
+# Build production Docker image
+docker build -t delineate-test -f docker/Dockerfile.prod .
+
+# Alternatively, use npm script
+npm run docker:prod
+
+# Verify image was created
+docker images | grep delineate
+```
+
+#### Step 4: Verify CI Configuration
+
+```bash
+# View CI workflow configuration
+cat .github/workflows/ci.yml
+
+# Key stages to verify:
+# - lint: ESLint + Prettier check
+# - test: E2E tests
+# - build: Docker image build
+# - security: CodeQL + npm audit
+```
+---
+
+### Challenge 4: Observability Dashboard Testing
+
+#### Step 1: Start Full Stack with Docker
+
+```bash
+# Start all services including frontend dashboard
+npm run docker:dev
+
+# Wait for all containers to be ready (15-20 seconds)
+docker ps
+
+# Expected containers:
+# - delineate-delineate-app-1        (port 3000)
+# - delineate-delineate-dashboard-1  (port 5173)
+# - delineate-delineate-jaeger-1     (ports 16686, 4318)
+# - delineate-rustfs-1               (ports 9000, 9001)
+# - delineate-redis-1                (port 6379) - for job queue
+```
+
+#### Step 2: Verify Dashboard Access
+
+```bash
+# Test dashboard is accessible
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5173
+
+# Expected: 200
+
+# Open in browser: http://localhost:5173
+```
+
+#### Step 3: Verify Jaeger Tracing
+
+```bash
+# Test Jaeger UI is accessible
+curl -s -o /dev/null -w "%{http_code}" http://localhost:16686
+
+# Expected: 200
+
+# Open Jaeger UI: http://localhost:16686
+# Select service: "delineate-api" to view traces
+```
+
+#### Step 4: Test Sentry Error Tracking
+
+```bash
+# Trigger intentional error for Sentry testing
+curl -s -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
+  -H "Content-Type: application/json" \
+  -d '{"file_id": 70000}'
+
+# Expected Response:
+# {
+#   "error": "Internal Server Error",
+#   "message": "Sentry test error triggered for file_id=70000 - This should appear in Sentry!",
+#   "requestId": "uuid-here"
+# }
+
+# If SENTRY_DSN is configured, this error appears in Sentry dashboard
+```
+
+#### Step 5: Verify Trace Propagation
+
+```bash
+# Make request with trace context header
+curl -s -X POST http://localhost:3000/v1/download/check \
+  -H "Content-Type: application/json" \
+  -H "traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" \
+  -d '{"file_id": 70000}' | jq
+
+# Check Jaeger UI for trace with ID: 4bf92f3577b34da6a3ce929d0e0e4736
+# Open: http://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736
+```
+
+#### Step 6: Test Dashboard Features
+
+Open http://localhost:5173 and verify:
+
+| Feature             | How to Test                                      |
+| ------------------- | ------------------------------------------------ |
+| Health Status       | Check green status indicator on dashboard        |
+| Download Tester     | Enter File ID, click "Start Download" button     |
+| Progress Bar        | Watch progress update 0% -> 100% during download |
+| Error Log           | Trigger Sentry test error, check error list      |
+| Trace Viewer        | Click "View in Jaeger" link after a request      |
+| Performance Metrics | Make several requests, observe response times    |
+
+**Download Flow in Frontend:**
+
+1. Enter a File ID (e.g., 70000)
+2. Click "Start Download"
+3. Watch progress bar update in real-time
+4. Final status shows "completed" (with download URL) or "failed" (with error message)
+
+> **Note:** File 70000 doesn't exist in S3, so downloads will complete with "File not found" message. This is **expected behavior** and demonstrates the async polling flow is working correctly. The progress bar updates from 0% → 100%, then shows the final status.
+
+#### Upload a Test File (Optional - for successful download)
+
+To test a successful download with an actual file:
+
+```bash
+# 1. Create a test file
+echo "Hello, this is test file 70000" > /tmp/testfile.txt
+
+# 2. Upload to RustFS using mc (MinIO Client)
+docker exec -it delineate-rustfs-init-1 mc cp /tmp/testfile.txt myrustfs/downloads/70000
+
+# Or using curl with presigned URL (if available)
+# Then test download - it should complete with downloadUrl
+```
+
+---
+
+---
+
+### Production Mode Testing
+
+```bash
+# Start production environment
+npm run docker:prod
+
+# Test through API Gateway (nginx)
+curl -s http://localhost/health | jq
+curl -s http://localhost/v1/download/check \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"file_id": 70000}' | jq
+
+# Access dashboard through gateway
+# Open: http://localhost
+```
+
+---
+
+## Quick Start
+
+### Prerequisites
 
 | Requirement    | Version    |
 | -------------- | ---------- |
@@ -409,18 +541,6 @@ Errors in Sentry tagged with: trace_id=abc123
 | npm            | >= 10.x    |
 | Docker         | >= 24.x    |
 | Docker Compose | >= 2.x     |
-
-## Tech Stack
-
-- **Runtime**: Node.js 24 with native TypeScript support
-- **Framework**: [Hono](https://hono.dev) - Ultra-fast web framework
-- **Validation**: [Zod](https://zod.dev) with OpenAPI integration
-- **Storage**: AWS S3 SDK (S3-compatible)
-- **Observability**: OpenTelemetry + Jaeger
-- **Error Tracking**: Sentry
-- **Documentation**: Scalar OpenAPI UI
-
-## Quick Start
 
 ### Local Development
 
@@ -431,14 +551,14 @@ npm install
 # Create environment file
 cp .env.example .env
 
-# Start development server (with hot reload, 5-15s delays)
+# Start development server (5-15s delays, hot reload)
 npm run dev
 
 # Or start production server (10-120s delays)
 npm run start
 ```
 
-The server will start at http://localhost:3000
+Server: http://localhost:3000
 
 - API Documentation: http://localhost:3000/docs
 - OpenAPI Spec: http://localhost:3000/openapi
@@ -449,9 +569,120 @@ The server will start at http://localhost:3000
 # Development mode (with Jaeger tracing)
 npm run docker:dev
 
-# Production mode
+# Production mode (with API Gateway)
 npm run docker:prod
 ```
+
+**Development Access Points:**
+| Service | URL |
+| --------- | ---------------------- |
+| Dashboard | http://localhost:5173 |
+| API | http://localhost:3000 |
+| Jaeger UI | http://localhost:16686 |
+| RustFS | http://localhost:9001 |
+
+**Production Access Points:**
+| Service | URL |
+| ----------- | ------------------ |
+| API Gateway | http://localhost |
+
+---
+
+## Tech Stack
+
+| Component      | Technology                                          |
+| -------------- | --------------------------------------------------- |
+| Runtime        | Node.js 24 with native TypeScript support           |
+| Framework      | [Hono](https://hono.dev) - Ultra-fast web framework |
+| Validation     | [Zod](https://zod.dev) with OpenAPI integration     |
+| Storage        | RustFS (S3-compatible)                              |
+| Observability  | OpenTelemetry + Jaeger                              |
+| Error Tracking | Sentry                                              |
+| Documentation  | Scalar OpenAPI UI                                   |
+| Frontend       | React + Vite + TailwindCSS                          |
+
+---
+
+## Project Structure
+
+```
+.
+├── src/
+│   ├── index.js              # Main API (circuit breaker, Redis, S3)
+│   └── instrument.js         # OpenTelemetry + Sentry setup
+├── frontend/                 # Observability Dashboard (React + Vite)
+│   ├── src/
+│   │   ├── components/       # HealthStatus, DownloadTester, FileUpload
+│   │   ├── hooks/            # Custom React hooks
+│   │   └── lib/              # Sentry & OpenTelemetry setup
+│   ├── Dockerfile            # Frontend Docker build
+│   └── package.json
+├── scripts/
+│   ├── e2e-test.js           # E2E test suite (45 tests)
+│   ├── run-e2e.js            # Test runner with server management
+│   ├── quick-test.js         # Quick health verification (11 tests)
+│   └── resilience-test.sh    # Redis/S3 failure testing
+├── docs/
+│   ├── CHALLENGE-1-COMPLETE.md    # Challenge 1: S3 integration guide
+│   ├── CHALLENGE-2-COMPLETE.md    # Challenge 2: Project documentation
+│   ├── CHALLENGE-2-CONCEPTS.md    # Challenge 2: Conceptual guide
+│   ├── TESTING_GUIDE.md           # Complete testing instructions
+│   ├── DOWNLOAD_API.md            # API documentation
+│   └── FUTURE_WORK.md             # Production roadmap
+├── docker/
+│   ├── Dockerfile.dev        # Development Dockerfile
+│   ├── Dockerfile.prod       # Production Dockerfile
+│   ├── compose.dev.yml       # Development Docker Compose
+│   └── compose.prod.yml      # Production Docker Compose
+├── .github/
+│   └── workflows/
+│       └── ci.yml            # GitHub Actions CI pipeline
+├── ARCHITECTURE.md           # Long-running download architecture design
+├── SUBMISSION.md             # Hackathon submission summary
+├── README(Given).md          # Original hackathon challenge requirements
+├── package.json
+├── tsconfig.json
+└── eslint.config.mjs
+```
+
+---
+
+## API Endpoints
+
+| Method | Endpoint                       | Description                              |
+| ------ | ------------------------------ | ---------------------------------------- |
+| GET    | `/`                            | Welcome message                          |
+| GET    | `/health`                      | Health check (S3, Redis, circuit status) |
+| GET    | `/docs`                        | API documentation (Scalar UI)            |
+| POST   | `/v1/download/initiate`        | Initiate bulk download job               |
+| POST   | `/v1/download/check`           | Check single file availability           |
+| POST   | `/v1/download/start`           | Start async download job                 |
+| GET    | `/v1/download/status/{userId}` | Poll download job status & progress      |
+| GET    | `/v1/download/file/{fileId}`   | Download file from S3                    |
+| POST   | `/v1/upload`                   | Upload file to S3                        |
+| GET    | `/v1/files`                    | List files in S3 bucket                  |
+
+### Testing Downloads
+
+```bash
+# With dev server running
+npm run dev
+
+# Start a download job (returns immediately)
+curl -X POST http://localhost:3000/v1/download/start \
+  -H "Content-Type: application/json" \
+  -d '{"file_id": 70000, "user_id": "my-user-id"}'
+
+# Poll for status (check progress)
+curl http://localhost:3000/v1/download/status/my-user-id
+
+# Test Sentry integration
+curl -X POST "http://localhost:3000/v1/download/check?sentry_test=true" \
+  -H "Content-Type: application/json" \
+  -d '{"file_id": 70000}'
+```
+
+---
 
 ## Environment Variables
 
@@ -465,14 +696,15 @@ PORT=3000
 # S3 Configuration
 S3_REGION=us-east-1
 S3_ENDPOINT=http://localhost:9000
-S3_ACCESS_KEY_ID=minioadmin
-S3_SECRET_ACCESS_KEY=minioadmin
+S3_ACCESS_KEY_ID=rustfsadmin
+S3_SECRET_ACCESS_KEY=rustfsadmin
 S3_BUCKET_NAME=downloads
 S3_FORCE_PATH_STYLE=true
 
-# Observability (optional)
-SENTRY_DSN=
+# Observability
+SENTRY_DSN=                                    # Your Sentry DSN
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+JAEGER_UI_URL=http://localhost:16686
 
 # Rate Limiting
 REQUEST_TIMEOUT_MS=30000
@@ -485,34 +717,10 @@ CORS_ORIGINS=*
 # Download Delay Simulation
 DOWNLOAD_DELAY_ENABLED=true
 DOWNLOAD_DELAY_MIN_MS=10000
-DOWNLOAD_DELAY_MAX_MS=200000
+DOWNLOAD_DELAY_MAX_MS=120000
 ```
 
-## API Endpoints
-
-| Method | Endpoint                | Description                         |
-| ------ | ----------------------- | ----------------------------------- |
-| GET    | `/`                     | Welcome message                     |
-| GET    | `/health`               | Health check with storage status    |
-| POST   | `/v1/download/initiate` | Initiate bulk download job          |
-| POST   | `/v1/download/check`    | Check single file availability      |
-| POST   | `/v1/download/start`    | Start download with simulated delay |
-
-### Testing the Long-Running Download
-
-```bash
-# With dev server (5-15s delays)
-npm run dev
-curl -X POST http://localhost:3000/v1/download/start \
-  -H "Content-Type: application/json" \
-  -d '{"file_id": 70000}'
-
-# With production server (10-120s delays) - may timeout!
-npm run start
-curl -X POST http://localhost:3000/v1/download/start \
-  -H "Content-Type: application/json" \
-  -d '{"file_id": 70000}'
-```
+---
 
 ## Available Scripts
 
@@ -523,76 +731,21 @@ npm run lint         # Run ESLint
 npm run lint:fix     # Fix linting issues
 npm run format       # Format code with Prettier
 npm run format:check # Check code formatting
-npm run test:e2e     # Run E2E tests
+npm run test:e2e     # Run E2E tests (45 tests, starts server)
+npm run test:e2e:only# Run E2E tests only (server must be running)
+npm run test:quick   # Quick health verification (11 tests, ~5s)
+npm run test:resilience # Redis/S3 failure tests (~2min)
 npm run docker:dev   # Start with Docker (development)
 npm run docker:prod  # Start with Docker (production)
 ```
 
-## Project Structure
-
-```
-.
-├── src/
-│   └── index.ts          # Main application entry point
-├── frontend/             # Observability Dashboard (React + Vite)
-│   ├── src/
-│   │   ├── components/   # React components
-│   │   ├── hooks/        # Custom React hooks
-│   │   └── lib/          # Sentry & OpenTelemetry setup
-│   ├── Dockerfile        # Frontend Docker build
-│   └── package.json
-├── scripts/
-│   ├── e2e-test.ts       # E2E test suite
-│   └── run-e2e.ts        # Test runner with server management
-├── docker/
-│   ├── Dockerfile.dev    # Development Dockerfile
-│   ├── Dockerfile.prod   # Production Dockerfile
-│   ├── compose.dev.yml   # Development Docker Compose
-│   └── compose.prod.yml  # Production Docker Compose
-├── .github/
-│   └── workflows/
-│       └── ci.yml        # GitHub Actions CI pipeline
-├── ARCHITECTURE.md       # Long-running download architecture design
-├── package.json
-├── tsconfig.json
-└── eslint.config.mjs
-```
-
-## Security Features
-
-- Request ID tracking for distributed tracing
-- Rate limiting with configurable windows
-- Security headers (HSTS, X-Frame-Options, etc.)
-- CORS configuration
-- Input validation with Zod schemas
-- Path traversal prevention for S3 keys
-- Graceful shutdown handling
+---
 
 ## CI/CD Pipeline
 
-This project uses GitHub Actions for continuous integration and deployment.
-
-### Pipeline Stages
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│    Lint     │───▶│    Test     │───▶│    Build    │    │  Security   │
-│  (ESLint,   │    │   (E2E)     │    │  (Docker)   │    │   (CodeQL)  │
-│  Prettier)  │    │             │    │             │    │             │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-```
-
-### Features
-
-- **Triggers**: Runs on push to `main`/`master` and on pull requests
-- **Caching**: npm dependencies are cached for faster builds
-- **Docker Build**: Builds production Docker image with layer caching
-- **Security Scanning**: CodeQL analysis and npm audit for vulnerability detection
-- **Concurrency**: Cancels redundant runs on the same branch
-
 ### Running Tests Locally
 
-Before pushing changes, run the following commands locally:
+Before pushing changes, run:
 
 ```bash
 # Run linting
@@ -616,35 +769,11 @@ npm run docker:prod
 4. Push to your fork and create a Pull Request
 5. Wait for CI checks to pass before requesting review
 
-## Observability Dashboard
+---
 
-The project includes a React-based observability dashboard located in the `frontend/` directory.
+## Observability Setup
 
-### Features
-
-| Feature             | Description                                    |
-| ------------------- | ---------------------------------------------- |
-| Health Status       | Real-time API health monitoring                |
-| Download Jobs       | Track download job status and progress         |
-| Error Log           | View errors captured by Sentry                 |
-| Trace Viewer        | Link to Jaeger UI for distributed tracing      |
-| Performance Metrics | API response times and success rates           |
-| Download Tester     | Test download functionality with trace context |
-
-### Running the Dashboard
-
-```bash
-# With Docker (recommended)
-npm run docker:dev
-
-# Access points:
-# - Dashboard: http://localhost:5173
-# - API: http://localhost:3000
-# - Jaeger UI: http://localhost:16686
-# - RustFS Console: http://localhost:9001
-```
-
-### Sentry Setup
+### Sentry Configuration
 
 1. Create a project at [sentry.io](https://sentry.io)
 2. Get your DSN from Project Settings > Client Keys
@@ -653,23 +782,18 @@ npm run docker:dev
    SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
    ```
 
-### OpenTelemetry Configuration
+### OpenTelemetry / Jaeger
 
-Traces are automatically sent to Jaeger when running with Docker. The dashboard propagates trace context to the backend for end-to-end tracing:
+Traces are automatically sent to Jaeger when running with Docker:
 
-```
-Frontend (trace-id: abc123)
-    │
-    ▼ traceparent header
-Backend logs: [trace_id=abc123]
-    │
-    ▼
-Jaeger UI: View complete trace
+```bash
+npm run docker:dev
+# Open Jaeger UI: http://localhost:16686
 ```
 
-### Dashboard Environment Variables
+### Frontend Dashboard Environment
 
-Create `frontend/.env` from the example:
+Create `frontend/.env`:
 
 ```env
 VITE_SENTRY_DSN=           # Your Sentry DSN
@@ -677,6 +801,162 @@ VITE_OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 VITE_JAEGER_UI_URL=http://localhost:16686
 ```
 
-## License
+---
 
-MIT
+## Resilience Features
+
+| Feature              | Implementation  | Behavior                             |
+| -------------------- | --------------- | ------------------------------------ |
+| Circuit Breaker (S3) | Opossum library | 5s timeout, 30s reset, 50% threshold |
+| Redis Failure        | 503 response    | Download jobs fail gracefully        |
+| Health Check Bypass  | Direct S3 check | Prevents circuit oscillation         |
+| Job TTL              | Redis SETEX     | Jobs expire after 5 minutes          |
+
+**Resilience Test Results:**
+
+![Resilience Test](images/resil_test.png)
+
+**Circuit Breaker States:**
+
+- `ok` - S3 operations normal
+- `circuit_open` - S3 failing, fast-fail mode (30s)
+- `error` - Connection error
+
+---
+
+## Security Features
+
+- Request ID tracking for distributed tracing
+- Rate limiting with configurable windows
+- Security headers (HSTS, X-Frame-Options, etc.)
+- CORS configuration
+- Input validation with Zod schemas
+- Path traversal prevention for S3 keys
+- Graceful shutdown handling
+- CodeQL security scanning in CI
+- npm audit for dependency vulnerabilities
+
+---
+
+## Docker Services
+
+### Development (`compose.dev.yml`)
+
+| Service             | Port(s)     | Description                   |
+| ------------------- | ----------- | ----------------------------- |
+| delineate-app       | 3000        | Main API server               |
+| delineate-dashboard | 5173        | React observability dashboard |
+| delineate-jaeger    | 16686, 4318 | Jaeger tracing UI & collector |
+| redis               | 6379        | Job queue (BullMQ)            |
+| rustfs              | 9000, 9001  | S3-compatible storage         |
+| rustfs-init         | -           | Bucket initialization         |
+
+### Production (`compose.prod.yml`)
+
+| Service             | Port | Description                      |
+| ------------------- | ---- | -------------------------------- |
+| delineate-gateway   | 80   | nginx API gateway                |
+| delineate-app       | -    | Main API server (internal)       |
+| delineate-dashboard | -    | React dashboard (internal)       |
+| rustfs              | -    | S3-compatible storage (internal) |
+| rustfs-init         | -    | Bucket initialization            |
+
+---
+
+## Deliverables Checklist
+
+### Challenge 1: S3 Storage Integration
+
+- [x] Add S3-compatible storage service (RustFS) to Docker Compose
+- [x] Create `downloads` bucket on startup
+- [x] Configure proper networking between services
+- [x] Update environment variables for API connectivity
+- [x] Pass all E2E tests (`npm run test:e2e`)
+- [x] Health endpoint returns `{"status": "healthy", "checks": {"storage": "ok"}}`
+
+### Challenge 2: Architecture Design
+
+- [x] `ARCHITECTURE.md` document created
+- [x] Architecture diagrams (high-level, fast path, slow path)
+- [x] Technical approach with pattern justification
+- [x] API contract changes documented
+- [x] Database/cache schema (Redis)
+- [x] Background job processing (BullMQ)
+- [x] Error handling and retry logic
+- [x] Timeout configuration at each layer
+- [x] Proxy configuration (Cloudflare, nginx, AWS ALB)
+- [x] Frontend integration (React hooks, components)
+
+### Challenge 3: CI/CD Pipeline
+
+- [x] `.github/workflows/ci.yml` configuration
+- [x] Trigger on push to `main`/`master`/`dev`
+- [x] Trigger on pull requests
+- [x] Run linting (`npm run lint`)
+- [x] Run format check (`npm run format:check`)
+- [x] Run E2E tests (`npm run test:e2e`)
+- [x] Build Docker image
+- [x] Cache dependencies for faster builds
+- [x] Fail fast on errors
+- [x] Security scanning (CodeQL, npm audit)
+- [x] CI badge in README
+
+### Challenge 4: Observability Dashboard
+
+- [x] React application in `frontend/` directory
+- [x] Sentry integration (error boundary, automatic capture)
+- [x] OpenTelemetry integration (trace propagation)
+- [x] Health Status display
+- [x] Download Jobs tracking
+- [x] Error Log viewer
+- [x] Trace Viewer (Jaeger link)
+- [x] Performance Metrics
+- [x] Docker Compose includes frontend & Jaeger
+- [x] Documentation for setup
+
+---
+
+## Documentation
+
+### Project Documentation
+
+| Document | Description |
+|----------|-------------|
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Complete architecture design for long-running downloads |
+| [`SUBMISSION.md`](./SUBMISSION.md) | Hackathon submission summary and deliverables |
+| [`README(Given).md`](./README(Given).md) | Original hackathon challenge requirements |
+
+### Challenge-Specific Documentation
+
+| Document | Description |
+|----------|-------------|
+| [`docs/CHALLENGE-1-COMPLETE.md`](./docs/CHALLENGE-1-COMPLETE.md) | Challenge 1: S3 Storage Integration - Complete guide |
+| [`docs/CHALLENGE-2-COMPLETE.md`](./docs/CHALLENGE-2-COMPLETE.md) | Challenge 2: Long-Running Downloads - Project documentation (API, testing, config) |
+| [`docs/CHALLENGE-2-CONCEPTS.md`](./docs/CHALLENGE-2-CONCEPTS.md) | Challenge 2: Conceptual guide (patterns, analogies, architecture) |
+
+### Testing & Operations
+
+| Document | Description |
+|----------|-------------|
+| [`docs/TESTING_GUIDE.md`](./docs/TESTING_GUIDE.md) | Complete testing instructions and verification steps |
+| [`docs/DOWNLOAD_API.md`](./docs/DOWNLOAD_API.md) | Download API documentation |
+| [`docs/FUTURE_WORK.md`](./docs/FUTURE_WORK.md) | Production roadmap and future improvements |
+
+---
+
+## Resources
+
+### External Documentation
+
+- [Hono Documentation](https://hono.dev/docs/)
+- [Sentry React SDK](https://docs.sentry.io/platforms/javascript/guides/react/)
+- [OpenTelemetry JavaScript](https://opentelemetry.io/docs/instrumentation/js/)
+- [Jaeger UI](https://www.jaegertracing.io/)
+- [RustFS](https://github.com/rustfs/rustfs)
+- [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+
+### Hackathon Reference
+
+This project was built for the **CUET Fest 2025 Hackathon** organized by [Delineate](https://github.com/bongodev). See [`README(Given).md`](./README(Given).md) for the original challenge requirements.
+
+---

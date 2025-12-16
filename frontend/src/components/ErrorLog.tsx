@@ -107,23 +107,23 @@ export function ErrorLog({ limit }: ErrorLogProps) {
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-lg font-semibold text-slate-900">
           Error Log
           {errors.length > 0 && (
-            <span className="text-sm text-red-400 ml-2">({errors.length})</span>
+            <span className="text-sm text-red-600 ml-2">({errors.length})</span>
           )}
         </h2>
         <div className="flex gap-2">
           <button
             onClick={triggerTestError}
-            className="text-sm text-yellow-400 hover:text-yellow-300"
+            className="text-sm text-amber-600 hover:text-amber-700 font-medium"
           >
             Test Sentry
           </button>
           {errors.length > 0 && (
             <button
               onClick={clearErrors}
-              className="text-sm text-red-400 hover:text-red-300"
+              className="text-sm text-red-600 hover:text-red-700 font-medium"
             >
               Clear
             </button>
@@ -132,7 +132,7 @@ export function ErrorLog({ limit }: ErrorLogProps) {
       </div>
 
       {displayErrors.length === 0 ? (
-        <div className="text-gray-400 text-center py-8">
+        <div className="text-slate-400 text-center py-8">
           No errors recorded. Click "Test Sentry" to generate a test error.
         </div>
       ) : (
@@ -140,18 +140,18 @@ export function ErrorLog({ limit }: ErrorLogProps) {
           {displayErrors.map((error) => (
             <div
               key={error.id}
-              className="bg-red-500/10 border border-red-500/20 rounded p-3"
+              className="bg-red-50 border border-red-200 rounded-lg p-3"
             >
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm text-red-300 break-all">
+                <p className="text-sm text-red-700 break-all">
                   {error.message}
                 </p>
-                <span className="text-xs text-gray-500 whitespace-nowrap">
+                <span className="text-xs text-slate-400 whitespace-nowrap">
                   {error.timestamp.toLocaleTimeString()}
                 </span>
               </div>
               {error.traceId && (
-                <div className="text-xs text-gray-500 mt-1 font-mono">
+                <div className="text-xs text-slate-400 mt-1 font-mono">
                   trace: {error.traceId.slice(0, 16)}...
                 </div>
               )}
@@ -159,7 +159,7 @@ export function ErrorLog({ limit }: ErrorLogProps) {
           ))}
 
           {limit && errors.length > limit && (
-            <div className="text-center text-sm text-gray-400 pt-2">
+            <div className="text-center text-sm text-slate-400 pt-2">
               +{errors.length - limit} more errors
             </div>
           )}

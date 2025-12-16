@@ -85,16 +85,16 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-lg font-semibold text-slate-900">
           Download Jobs
           {jobs.length > 0 && (
-            <span className="text-sm text-gray-400 ml-2">({jobs.length})</span>
+            <span className="text-sm text-slate-400 ml-2">({jobs.length})</span>
           )}
         </h2>
         {jobs.length > 0 && (
           <button
             onClick={clearJobs}
-            className="text-sm text-red-400 hover:text-red-300"
+            className="text-sm text-red-600 hover:text-red-700 font-medium"
           >
             Clear All
           </button>
@@ -102,7 +102,7 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
       </div>
 
       {displayJobs.length === 0 ? (
-        <div className="text-gray-400 text-center py-8">
+        <div className="text-slate-400 text-center py-8">
           No download jobs yet. Use the Download Tester to create jobs.
         </div>
       ) : (
@@ -110,15 +110,15 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
           {displayJobs.map((job) => (
             <div
               key={job.id}
-              className="bg-gray-700/50 rounded-lg p-3 space-y-2"
+              className="bg-slate-50 rounded-lg p-3 space-y-2 border border-slate-200"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm">
+                  <span className="font-mono text-sm text-slate-700">
                     {job.id.slice(0, 8)}
                   </span>
-                  <span className="text-gray-400">|</span>
-                  <span className="text-sm">File: {job.fileId}</span>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-sm text-slate-600">File: {job.fileId}</span>
                 </div>
                 <span className={`status-badge status-${job.status}`}>
                   {job.status}
@@ -126,15 +126,15 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
               </div>
 
               {job.status === "processing" && (
-                <div className="w-full bg-gray-600 rounded-full h-2">
+                <div className="progress-bar">
                   <div
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    className="progress-bar-fill"
                     style={{ width: `${job.progress}%` }}
                   />
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-xs text-gray-400">
+              <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>Started: {job.startedAt.toLocaleTimeString()}</span>
                 {job.processingTimeMs && (
                   <span>{(job.processingTimeMs / 1000).toFixed(1)}s</span>
@@ -142,7 +142,7 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
               </div>
 
               {job.error && (
-                <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded">
+                <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100">
                   {job.error}
                 </div>
               )}
@@ -150,7 +150,7 @@ export function DownloadJobs({ limit }: DownloadJobsProps) {
           ))}
 
           {limit && jobs.length > limit && (
-            <div className="text-center text-sm text-gray-400 pt-2">
+            <div className="text-center text-sm text-slate-400 pt-2">
               +{jobs.length - limit} more jobs
             </div>
           )}

@@ -7,14 +7,6 @@ interface UploadedFile {
   fileId: number | null;
 }
 
-interface UploadResult {
-  success: boolean;
-  fileId: number;
-  s3Key: string;
-  size: number;
-  message: string;
-}
-
 const API_BASE = "/api";
 
 export function FileUpload() {
@@ -35,6 +27,10 @@ export function FileUpload() {
       const data = await response.json();
       if (response.ok) {
         setFiles(data.files || []);
+      } else if (response.status === 503) {
+        setError(
+          "Storage service temporarily unavailable. The system may be recovering from an outage.",
+        );
       } else {
         setError(data.message || "Failed to fetch files");
       }
@@ -77,17 +73,23 @@ export function FileUpload() {
         body: formData,
       });
 
-      const data: UploadResult = await response.json();
+      const data = await response.json();
 
       if (response.ok && data.success) {
         setSuccess(`File uploaded successfully! S3 Key: ${data.s3Key}`);
         setSelectedFile(null);
         setFileId("");
         // Reset file input
-        const fileInput = document.getElementById("file-input") as HTMLInputElement;
+        const fileInput = document.getElementById(
+          "file-input",
+        ) as HTMLInputElement;
         if (fileInput) fileInput.value = "";
         // Refresh file list
         fetchFiles();
+      } else if (response.status === 503) {
+        setError(
+          "Storage service temporarily unavailable. Please check the System Health panel and try again later.",
+        );
       } else {
         setError(data.message || "Upload failed");
       }
@@ -116,12 +118,12 @@ export function FileUpload() {
   return (
     <div className="space-y-6">
       {/* Upload Form */}
-      <div className="bg-gray-800 rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Upload File to S3</h2>
+      <div className="card">
+        <h2 className="text-xl font-semibold text-slate-900 mb-4">Upload File to S3</h2>
 
         <form onSubmit={handleUpload} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-slate-600 mb-2">
               File ID (10,000 - 100,000,000)
             </label>
             <input
@@ -131,22 +133,22 @@ export function FileUpload() {
               placeholder="Enter file ID (e.g., 70000)"
               min="10000"
               max="100000000"
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-slate-600 mb-2">
               Select File
             </label>
             <input
               id="file-input"
               type="file"
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+              className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer"
             />
             {selectedFile && (
-              <p className="mt-2 text-sm text-gray-400">
+              <p className="mt-2 text-sm text-slate-500">
                 Selected: {selectedFile.name} ({formatSize(selectedFile.size)})
               </p>
             )}
@@ -155,7 +157,7 @@ export function FileUpload() {
           <button
             type="submit"
             disabled={uploading || !selectedFile || !fileId}
-            className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+            className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors shadow-sm"
           >
             {uploading ? "Uploading..." : "Upload File"}
           </button>
@@ -163,41 +165,58 @@ export function FileUpload() {
 
         {/* Messages */}
         {error && (
-          <div className="mt-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300">
-            {error}
+          <div
+            className={`mt-4 p-4 rounded-lg ${
+              error.includes("unavailable") || error.includes("Service")
+                ? "alert-error"
+                : "alert-error"
+            }`}
+          >
+            <div className="font-medium">
+              {error.includes("unavailable") || error.includes("Service")
+                ? "Service Error"
+                : "Error"}
+            </div>
+            <div className="mt-1 text-sm">{error}</div>
+            {(error.includes("unavailable") || error.includes("Service")) && (
+              <div className="mt-2 text-xs opacity-80">
+                The storage service (S3) may be experiencing issues or the
+                circuit breaker is active.
+              </div>
+            )}
           </div>
         )}
         {success && (
-          <div className="mt-4 p-3 bg-green-900/50 border border-green-700 rounded-lg text-green-300">
+          <div className="alert-success mt-4">
             {success}
           </div>
         )}
       </div>
 
       {/* File List */}
-      <div className="bg-gray-800 rounded-lg p-6">
+      <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Files in S3 Bucket</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Files in S3 Bucket</h2>
           <button
             onClick={fetchFiles}
             disabled={loading}
-            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-sm rounded-lg transition-colors"
+            className="btn-secondary text-sm"
           >
             {loading ? "Loading..." : "Refresh"}
           </button>
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-gray-400">Loading files...</div>
+          <div className="text-center py-8 text-slate-400">Loading files...</div>
         ) : files.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
+          <div className="text-center py-8 text-slate-400">
             No files in bucket. Upload a file to get started!
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="text-left text-gray-400 border-b border-gray-700">
+                <tr className="text-left text-slate-500 border-b border-slate-200">
                   <th className="pb-3 font-medium">File ID</th>
                   <th className="pb-3 font-medium">S3 Key</th>
                   <th className="pb-3 font-medium">Size</th>
@@ -206,17 +225,19 @@ export function FileUpload() {
               </thead>
               <tbody>
                 {files.map((file, index) => (
-                  <tr key={index} className="border-b border-gray-700/50">
+                  <tr key={index} className="border-b border-slate-100">
                     <td className="py-3">
-                      <span className="px-2 py-1 bg-blue-900/50 text-blue-300 rounded text-sm font-mono">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm font-mono">
                         {file.fileId ?? "-"}
                       </span>
                     </td>
-                    <td className="py-3 text-gray-300 font-mono text-sm">
+                    <td className="py-3 text-slate-600 font-mono text-sm">
                       {file.key}
                     </td>
-                    <td className="py-3 text-gray-300">{formatSize(file.size)}</td>
-                    <td className="py-3 text-gray-400 text-sm">
+                    <td className="py-3 text-slate-600">
+                      {formatSize(file.size)}
+                    </td>
+                    <td className="py-3 text-slate-400 text-sm">
                       {formatDate(file.lastModified)}
                     </td>
                   </tr>
@@ -226,7 +247,7 @@ export function FileUpload() {
           </div>
         )}
 
-        <div className="mt-4 text-sm text-gray-400">
+        <div className="mt-4 text-sm text-slate-400">
           Total files: {files.length}
         </div>
       </div>

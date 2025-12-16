@@ -10,7 +10,8 @@
 
 # deps
 node_modules/
-docs/
+# docs/
+doc/
 assets/
 # env
 .env

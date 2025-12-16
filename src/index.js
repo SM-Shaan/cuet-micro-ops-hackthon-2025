@@ -18,6 +18,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { timeout } from "hono/timeout";
 import { rateLimiter } from "hono-rate-limiter";
 import Redis from "ioredis";
+import CircuitBreaker from "opossum";
 
 // Helper for optional URL that treats empty string as undefined
 const optionalUrl = z
@@ -37,8 +38,16 @@ const EnvSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_ENDPOINT: optionalUrl,
   S3_BUCKET_NAME: z.string().default(""),
-  S3_FORCE_PATH_STYLE: z.string().optional().transform((val) => val === "true").default(false),
-  S3_MOCK_MODE: z.string().optional().transform((val) => val === "true").default(false),
+  S3_FORCE_PATH_STYLE: z
+    .string()
+    .optional()
+    .transform((val) => val === "true")
+    .default(false),
+  S3_MOCK_MODE: z
+    .string()
+    .optional()
+    .transform((val) => val === "true")
+    .default(false),
   SENTRY_DSN: optionalUrl,
   OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrl,
   REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30000),
@@ -52,7 +61,11 @@ const EnvSchema = z.object({
   DOWNLOAD_DELAY_MIN_MS: z.coerce.number().int().min(0).default(10000), // 10 seconds
   // DOWNLOAD_DELAY_MAX_MS: z.coerce.number().int().min(0).default(200000), // 200 seconds
   DOWNLOAD_DELAY_MAX_MS: z.coerce.number().int().min(0).default(20000), // 200 seconds
-  DOWNLOAD_DELAY_ENABLED: z.string().optional().transform((val) => val !== "false").default(true),
+  DOWNLOAD_DELAY_ENABLED: z
+    .string()
+    .optional()
+    .transform((val) => val !== "false")
+    .default(true),
   // Redis configuration
   REDIS_URL: z.string().default("redis://localhost:6379"),
   REDIS_KEY_PREFIX: z.string().default("download:"),
@@ -75,6 +88,55 @@ const s3Client = new S3Client({
     }),
   forcePathStyle: env.S3_FORCE_PATH_STYLE,
 });
+
+// Circuit Breaker for S3 operations
+// Prevents cascading failures when S3 is down - fails fast instead of waiting for timeout
+const s3SendWithBreaker = async (command) => {
+  return s3Client.send(command);
+};
+
+const s3Breaker = new CircuitBreaker(s3SendWithBreaker, {
+  timeout: 5000, // 5 second timeout per request
+  errorThresholdPercentage: 50, // Open circuit if 50% of requests fail
+  resetTimeout: 30000, // Try again after 30 seconds
+  volumeThreshold: 5, // Minimum 5 requests before circuit can open
+});
+
+// Track circuit state for health checks
+let s3CircuitOpen = false;
+
+s3Breaker.on("open", () => {
+  s3CircuitOpen = true;
+  console.warn("[S3 Circuit Breaker] OPEN - S3 requests will fail fast");
+});
+
+s3Breaker.on("halfOpen", () => {
+  console.log("[S3 Circuit Breaker] HALF-OPEN - Testing S3 connection...");
+});
+
+s3Breaker.on("close", () => {
+  s3CircuitOpen = false;
+  console.log("[S3 Circuit Breaker] CLOSED - S3 connection restored");
+});
+
+s3Breaker.on("fallback", () => {
+  console.log("[S3 Circuit Breaker] Fallback triggered");
+});
+
+// Helper to execute S3 commands with circuit breaker
+const s3Send = async (command) => {
+  try {
+    return await s3Breaker.fire(command);
+  } catch (err) {
+    // Check if circuit is open (fail-fast scenario)
+    if (s3Breaker.opened) {
+      const error = new Error("S3 service unavailable (circuit open)");
+      error.name = "CircuitBreakerOpen";
+      throw error;
+    }
+    throw err;
+  }
+};
 
 // Redis Client with fallback support
 let redisConnected = false;
@@ -205,7 +267,8 @@ const HealthResponseSchema = z
   .object({
     status: z.enum(["healthy", "unhealthy"]),
     checks: z.object({
-      storage: z.enum(["ok", "error"]),
+      storage: z.enum(["ok", "error", "circuit_open"]),
+      redis: z.enum(["ok", "error"]),
     }),
   })
   .openapi("HealthResponse");
@@ -352,26 +415,43 @@ const sanitizeS3Key = (fileId) => {
   return `downloads/${String(sanitizedId)}.zip`;
 };
 
-// S3 health check
+// S3 health check (bypasses circuit breaker - health checks shouldn't affect circuit state)
 const checkS3Health = async () => {
   if (!env.S3_BUCKET_NAME || env.S3_MOCK_MODE) return true; // Mock mode
+
+  // If circuit is open, report unhealthy immediately (but don't try to connect)
+  if (s3CircuitOpen) return false;
+
   try {
     // Use a lightweight HEAD request on a known path
+    // IMPORTANT: Bypass circuit breaker to avoid health checks affecting circuit state
     const command = new HeadObjectCommand({
       Bucket: env.S3_BUCKET_NAME,
       Key: "__health_check_marker__",
     });
-    await s3Client.send(command);
+    // Use s3Client.send directly (not s3Send) to bypass circuit breaker
+    await Promise.race([
+      s3Client.send(command),
+      new Promise((_, reject) =>
+        setTimeout(() => {
+          reject(new Error("Health check timeout"));
+        }, 3000),
+      ),
+    ]);
     return true;
   } catch (err) {
     // NotFound is fine - bucket is accessible
     if (err instanceof Error && err.name === "NotFound") return true;
-    // AccessDenied or other errors indicate connection issues
+    // Timeout or other errors - S3 might be slow but not necessarily down
+    console.log(
+      "[Health] S3 health check failed:",
+      err instanceof Error ? err.message : "Unknown error",
+    );
     return false;
   }
 };
 
-// S3 availability check
+// S3 availability check (uses circuit breaker)
 const checkS3Availability = async (fileId) => {
   const s3Key = sanitizeS3Key(fileId);
 
@@ -390,7 +470,7 @@ const checkS3Availability = async (fileId) => {
       Bucket: env.S3_BUCKET_NAME,
       Key: s3Key,
     });
-    const response = await s3Client.send(command);
+    const response = await s3Send(command);
     return {
       available: true,
       s3Key,
@@ -442,8 +522,10 @@ const jobStore = {
         env.REDIS_JOB_TTL_SECONDS,
         JSON.stringify(job),
       );
+      return true;
     } catch (err) {
       console.error(`[Redis] Error setting job for userId=${userId}:`, err);
+      return false;
     }
   },
 
@@ -625,13 +707,21 @@ app.openapi(debugSentryRoute, (c) => {
 
 app.openapi(healthRoute, async (c) => {
   const storageHealthy = await checkS3Health();
-  const status = storageHealthy ? "healthy" : "unhealthy";
-  const httpStatus = storageHealthy ? 200 : 503;
+  const storageStatus = s3CircuitOpen
+    ? "circuit_open"
+    : storageHealthy
+      ? "ok"
+      : "error";
+  const redisStatus = redisConnected ? "ok" : "error";
+  const allHealthy = storageHealthy && redisConnected && !s3CircuitOpen;
+  const status = allHealthy ? "healthy" : "unhealthy";
+  const httpStatus = allHealthy ? 200 : 503;
   return c.json(
     {
       status,
       checks: {
-        storage: storageHealthy ? "ok" : "error",
+        storage: storageStatus,
+        redis: redisStatus,
       },
     },
     httpStatus,
@@ -812,6 +902,14 @@ const downloadStartRoute = createRoute({
         },
       },
     },
+    503: {
+      description: "Service unavailable (Redis down)",
+      content: {
+        "application/json": {
+          schema: ErrorResponseSchema,
+        },
+      },
+    },
   },
 });
 
@@ -855,6 +953,22 @@ const downloadStatusRoute = createRoute({
 app.openapi(downloadStartRoute, async (c) => {
   const { file_id, user_id } = c.req.valid("json");
 
+  // Check Redis connectivity - return 503 if Redis is down (fixes silent failure bug)
+  if (!redisConnected) {
+    console.error(
+      `[Download] Redis unavailable - rejecting job for userId=${user_id}`,
+    );
+    return c.json(
+      {
+        error: "Service Unavailable",
+        message:
+          "Job storage temporarily unavailable. Please retry in a few moments.",
+        requestId: c.get("requestId"),
+      },
+      503,
+    );
+  }
+
   // Check if user already has an active job (idempotency) - Redis lookup
   const existingJob = await jobStore.get(user_id);
 
@@ -893,7 +1007,22 @@ app.openapi(downloadStartRoute, async (c) => {
   };
 
   // Store job in Redis with userId as key
-  await jobStore.set(user_id, job);
+  const stored = await jobStore.set(user_id, job);
+
+  // If storage failed, return 503 (fixes silent failure bug)
+  if (!stored) {
+    console.error(
+      `[Download] Failed to store job in Redis for userId=${user_id}`,
+    );
+    return c.json(
+      {
+        error: "Service Unavailable",
+        message: "Failed to queue job. Please retry in a few moments.",
+        requestId: c.get("requestId"),
+      },
+      503,
+    );
+  }
 
   console.log(
     `[Download] Created new job userId=${user_id} jobId=${jobId} fileId=${String(file_id)}`,
@@ -999,7 +1128,9 @@ const uploadFileRoute = createRoute({
         "multipart/form-data": {
           schema: z.object({
             file: z.any().openapi({ description: "File to upload" }),
-            file_id: z.string().openapi({ description: "File ID (10000-100000000)" }),
+            file_id: z
+              .string()
+              .openapi({ description: "File ID (10000-100000000)" }),
           }),
         },
       },
@@ -1094,7 +1225,7 @@ app.openapi(uploadFileRoute, async (c) => {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to S3 with original filename in metadata
+    // Upload to S3 with original filename in metadata (uses circuit breaker)
     const command = new PutObjectCommand({
       Bucket: env.S3_BUCKET_NAME,
       Key: s3Key,
@@ -1105,7 +1236,7 @@ app.openapi(uploadFileRoute, async (c) => {
       },
     });
 
-    await s3Client.send(command);
+    await s3Send(command);
 
     console.log(`[Upload] File uploaded: ${s3Key} (${buffer.length} bytes)`);
 
@@ -1120,6 +1251,19 @@ app.openapi(uploadFileRoute, async (c) => {
       200,
     );
   } catch (error) {
+    // Circuit breaker open - fail fast
+    if (error instanceof Error && error.name === "CircuitBreakerOpen") {
+      return c.json(
+        {
+          error: "Service Unavailable",
+          message:
+            "Storage service temporarily unavailable. Please retry in a few moments.",
+          requestId: c.get("requestId"),
+        },
+        503,
+      );
+    }
+
     console.error("[Upload] Error:", error);
     return c.json(
       {
@@ -1137,7 +1281,6 @@ app.openapi(listFilesRoute, async (c) => {
   try {
     // If mock mode, return empty list
     if (env.S3_MOCK_MODE || !env.S3_BUCKET_NAME) {
-
       return c.json(
         {
           files: [],
@@ -1151,7 +1294,7 @@ app.openapi(listFilesRoute, async (c) => {
       Bucket: env.S3_BUCKET_NAME,
     });
 
-    const response = await s3Client.send(command);
+    const response = await s3Send(command);
     const files = (response.Contents || []).map((obj) => {
       // Extract file ID from key (e.g., "downloads/12345.zip" -> 12345)
       const match = obj.Key?.match(/downloads\/(\d+)\.zip/);
@@ -1173,6 +1316,19 @@ app.openapi(listFilesRoute, async (c) => {
       200,
     );
   } catch (error) {
+    // Circuit breaker open - fail fast
+    if (error instanceof Error && error.name === "CircuitBreakerOpen") {
+      return c.json(
+        {
+          error: "Service Unavailable",
+          message:
+            "Storage service temporarily unavailable. Please retry in a few moments.",
+          requestId: c.get("requestId"),
+        },
+        503,
+      );
+    }
+
     console.error("[ListFiles] Error:", error);
     return c.json(
       {
@@ -1253,7 +1409,7 @@ app.openapi(downloadFileRoute, async (c) => {
       Key: s3Key,
     });
 
-    const response = await s3Client.send(command);
+    const response = await s3Send(command);
 
     if (!response.Body) {
       return c.json(
@@ -1272,9 +1428,15 @@ app.openapi(downloadFileRoute, async (c) => {
       : `${fileId}.zip`;
 
     // Set headers for file download
-    c.header("Content-Type", response.ContentType || "application/octet-stream");
+    c.header(
+      "Content-Type",
+      response.ContentType || "application/octet-stream",
+    );
     c.header("Content-Length", String(response.ContentLength || 0));
-    c.header("Content-Disposition", `attachment; filename="${originalFilename}"`);
+    c.header(
+      "Content-Disposition",
+      `attachment; filename="${originalFilename}"`,
+    );
 
     // Stream the response
     return new Response(response.Body, {
@@ -1290,6 +1452,19 @@ app.openapi(downloadFileRoute, async (c) => {
           requestId: c.get("requestId"),
         },
         404,
+      );
+    }
+
+    // Circuit breaker open - fail fast
+    if (error instanceof Error && error.name === "CircuitBreakerOpen") {
+      return c.json(
+        {
+          error: "Service Unavailable",
+          message:
+            "Storage service temporarily unavailable. Please retry in a few moments.",
+          requestId: c.get("requestId"),
+        },
+        503,
       );
     }
 

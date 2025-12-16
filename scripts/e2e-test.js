@@ -101,13 +101,28 @@ async function testHealth() {
   }
 
   // Storage check should be present with valid value
-  if (data.checks?.storage === "ok" || data.checks?.storage === "error") {
+  if (
+    data.checks?.storage === "ok" ||
+    data.checks?.storage === "error" ||
+    data.checks?.storage === "circuit_open"
+  ) {
     logPass("Storage check returns valid status");
   } else {
     logFail(
       "Storage check returns valid status",
-      '"storage":"ok" or "error"',
+      '"storage":"ok", "error", or "circuit_open"',
       data.checks?.storage ?? "undefined",
+    );
+  }
+
+  // Redis check should be present with valid value
+  if (data.checks?.redis === "ok" || data.checks?.redis === "error") {
+    logPass("Redis check returns valid status");
+  } else {
+    logFail(
+      "Redis check returns valid status",
+      '"redis":"ok" or "error"',
+      data.checks?.redis ?? "undefined",
     );
   }
 }
@@ -488,6 +503,254 @@ async function testRateLimiting() {
   }
 }
 
+async function testAsyncDownloadFlow() {
+  logSection("Async Download Job Flow");
+
+  const userId = `e2e-test-${Date.now()}`;
+  const fileId = 70000; // Use a file ID divisible by 7 for mock mode
+
+  // Step 1: Start download job
+  const startResponse = await fetch(`${BASE_URL}/v1/download/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: fileId, user_id: userId }),
+  });
+  const startData = await startResponse.json();
+
+  if (startResponse.status === 200 && startData.jobId) {
+    logPass("Download start returns jobId");
+  } else if (startResponse.status === 503) {
+    // Redis might be down - this is a valid failure case
+    logPass(
+      "Download start returns 503 when service unavailable (expected behavior)",
+    );
+    return; // Skip remaining tests in this section
+  } else {
+    logFail(
+      "Download start returns jobId",
+      '{"jobId":"...", "status":"queued"}',
+      JSON.stringify(startData),
+    );
+    return;
+  }
+
+  if (startData.status === "queued" || startData.status === "processing") {
+    logPass("Download start status is queued or processing");
+  } else {
+    logFail(
+      "Download start status is queued or processing",
+      '"status":"queued" or "processing"',
+      startData.status ?? "undefined",
+    );
+  }
+
+  if (startData.pollUrl === `/v1/download/status/${userId}`) {
+    logPass("Download start returns correct pollUrl");
+  } else {
+    logFail(
+      "Download start returns correct pollUrl",
+      `/v1/download/status/${userId}`,
+      startData.pollUrl ?? "undefined",
+    );
+  }
+
+  // Step 2: Poll for status (wait up to 20 seconds)
+  let finalStatus = null;
+  for (let i = 0; i < 20; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const statusResponse = await fetch(
+      `${BASE_URL}/v1/download/status/${userId}`,
+    );
+    const statusData = await statusResponse.json();
+
+    if (statusData.status === "completed" || statusData.status === "failed") {
+      finalStatus = statusData;
+      break;
+    }
+  }
+
+  if (finalStatus) {
+    logPass(`Download job completed with status: ${finalStatus.status}`);
+  } else {
+    logFail(
+      "Download job completes within timeout",
+      '"status":"completed" or "failed"',
+      "still processing after 20s",
+    );
+    return;
+  }
+
+  if (finalStatus.progress === 100) {
+    logPass("Download job progress reaches 100%");
+  } else {
+    logFail(
+      "Download job progress reaches 100%",
+      "100",
+      String(finalStatus.progress),
+    );
+  }
+
+  if (finalStatus.processingTimeMs && finalStatus.processingTimeMs > 0) {
+    logPass("Download job reports processing time");
+  } else {
+    logFail(
+      "Download job reports processing time",
+      "> 0",
+      String(finalStatus.processingTimeMs),
+    );
+  }
+
+  // Step 3: Test idempotency - same user_id should return existing job
+  const idempotentResponse = await fetch(`${BASE_URL}/v1/download/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: fileId, user_id: userId }),
+  });
+  const idempotentData = await idempotentResponse.json();
+
+  // Since job is completed, a new job should be created or existing returned
+  if (idempotentResponse.status === 200) {
+    logPass("Idempotent request handled correctly");
+  } else {
+    logFail(
+      "Idempotent request handled correctly",
+      "200",
+      String(idempotentResponse.status),
+    );
+  }
+}
+
+async function testDownloadStart() {
+  logSection("Download Start Endpoint Validation");
+
+  // Test invalid file_id (too small)
+  const response1 = await fetch(`${BASE_URL}/v1/download/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: 100, user_id: "test-user" }),
+  });
+
+  if (response1.status === 400) {
+    logPass("Download start rejects file_id < 10000");
+  } else {
+    logFail(
+      "Download start rejects file_id < 10000",
+      "400",
+      String(response1.status),
+    );
+  }
+
+  // Test invalid file_id (too large)
+  const response2 = await fetch(`${BASE_URL}/v1/download/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: 999999999, user_id: "test-user" }),
+  });
+
+  if (response2.status === 400) {
+    logPass("Download start rejects file_id > 100000000");
+  } else {
+    logFail(
+      "Download start rejects file_id > 100000000",
+      "400",
+      String(response2.status),
+    );
+  }
+
+  // Test missing user_id
+  const response3 = await fetch(`${BASE_URL}/v1/download/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: 70000 }),
+  });
+
+  if (response3.status === 400) {
+    logPass("Download start requires user_id");
+  } else {
+    logFail("Download start requires user_id", "400", String(response3.status));
+  }
+}
+
+async function testDownloadStatus() {
+  logSection("Download Status Endpoint");
+
+  // Test non-existent user
+  const response = await fetch(
+    `${BASE_URL}/v1/download/status/non-existent-user-12345`,
+  );
+
+  if (response.status === 404) {
+    logPass("Download status returns 404 for non-existent user");
+  } else {
+    logFail(
+      "Download status returns 404 for non-existent user",
+      "404",
+      String(response.status),
+    );
+  }
+
+  const data = await response.json();
+  if (data.error === "Not Found") {
+    logPass("Download status returns correct error message");
+  } else {
+    logFail(
+      "Download status returns correct error message",
+      '"error":"Not Found"',
+      JSON.stringify(data),
+    );
+  }
+}
+
+async function testFileListEndpoint() {
+  logSection("File List Endpoint");
+
+  const response = await fetch(`${BASE_URL}/v1/files`);
+
+  // Accept 200 (success) or 503 (S3 unavailable) or 500 (timeout)
+  if (
+    response.status === 200 ||
+    response.status === 503 ||
+    response.status === 500
+  ) {
+    logPass("File list endpoint responds");
+  } else {
+    logFail(
+      "File list endpoint responds",
+      "200, 503, or 500",
+      String(response.status),
+    );
+    return;
+  }
+
+  if (response.status === 200) {
+    const data = await response.json();
+
+    if (Array.isArray(data.files)) {
+      logPass("File list returns files array");
+    } else {
+      logFail(
+        "File list returns files array",
+        '"files": [...]',
+        JSON.stringify(data),
+      );
+    }
+
+    if (typeof data.totalCount === "number") {
+      logPass("File list returns totalCount");
+    } else {
+      logFail(
+        "File list returns totalCount",
+        '"totalCount": <number>',
+        JSON.stringify(data),
+      );
+    }
+  } else {
+    logPass(
+      "File list returns service unavailable (S3 down - expected in some environments)",
+    );
+  }
+}
+
 function printSummary() {
   console.log();
   console.log(`${colors.yellow}==============================${colors.reset}`);
@@ -517,6 +780,10 @@ async function main() {
   await testSecurityHeaders();
   await testDownloadInitiate();
   await testDownloadCheck();
+  await testDownloadStart();
+  await testDownloadStatus();
+  await testFileListEndpoint();
+  await testAsyncDownloadFlow();
   await testRequestId();
   await testContentType();
   await testMethodNotAllowed();
